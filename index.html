@@ -230,10 +230,19 @@ table th:first-child, table td:first-child {
 }
 .radar-container {
     position: relative;
-    width: 220px;  /* Tăng từ 100px lên 220px */
-    height: 220px; /* Tăng từ 100px lên 220px */
+    width: 220px;   /* Kích thước Mobile như hiện tại */
+    height: 220px;
     margin: 0 auto;
+    transition: all 0.5s ease;
 }
+
+@media (min-width: 1024px) {
+    .radar-container {
+        width: 450px;  /* Kích thước to hơn hẳn trên PC */
+        height: 450px;
+    }
+}
+
 .radar-circle {
     position: absolute;
     inset: 0;
@@ -264,7 +273,7 @@ table th:first-child, table td:first-child {
     <div class="mesh-bg"></div> <!-- Giữ nền gradient phía sau -->
     <div class="relative flex flex-col items-center">
         <!-- Radar Animation -->
-        <div class="radar-container scale-75 mb-8">
+        <div class="radar-container scale-90 lg:scale-100 mb-8 lg:mb-16">
             <div class="radar-circle"></div>
             <div class="radar-circle" style="inset: 20%"></div>
             <div class="radar-circle" style="inset: 40%"></div>
@@ -748,7 +757,7 @@ if(!snap.exists()) {
     body.innerHTML = `
         <tr>
             <td colspan="20" class="py-20 text-center border-none bg-transparent"> 
-                <div class="radar-container mb-10 scale-125 lg:scale-150"> <!-- Scale để radar to rõ hơn trong khung rộng -->
+                <div class="radar-container mb-10 lg:mb-20"> <!-- Scale để radar to rõ hơn trong khung rộng -->
                     <div class="radar-circle"></div>
                     <div class="radar-circle" style="inset: 20%"></div>
                     <div class="radar-circle" style="inset: 40%"></div>
