@@ -409,15 +409,21 @@ table th:first-child, table td:first-child {
                 </div>
             </div>
 
-            <!-- Input Xác nhận mật khẩu (Sẽ hiện khi Đăng ký) -->
+            <!-- Input Xác nhận mật khẩu (Đã thêm nút con mắt) -->
             <div id="confirm-password-container" class="space-y-1 hidden overflow-hidden transition-all duration-500 ease-in-out shadow-inner">
                 <label class="text-[10px] text-slate-400 ml-2 uppercase font-bold tracking-widest text-blue-400">Xác nhận mật khẩu</label>
                 <div class="relative">
                     <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-blue-400">
                         <i class="fa-solid fa-check-double"></i>
                     </span>
+                    <!-- Tăng padding-right lên pr-12 để không bị đè chữ vào con mắt -->
                     <input type="password" id="auth-confirm-password" placeholder="••••••••" 
-                           class="w-full pl-11 pr-4 py-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white">
+                        class="w-full pl-11 pr-12 py-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white">
+                    
+                    <!-- NÚT CON MẮT MỚI THÊM -->
+                    <button type="button" onclick="togglePassword('auth-confirm-password')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white transition-colors">
+                        <i class="fa-solid fa-eye text-sm"></i>
+                    </button>
                 </div>
             </div>
 
@@ -427,6 +433,18 @@ table th:first-child, table td:first-child {
                     <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
                     <span id="btn-auth-text" class="relative font-black uppercase tracking-widest text-xs">Đăng nhập ngay</span>
                 </button>
+
+                <!-- Nút đăng nhập MXH -->
+                <div class="grid grid-cols-2 gap-4 mt-6">
+                    <button onclick="loginWithGoogle()" class="flex items-center justify-center gap-2 py-3 px-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all">
+                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5">
+                        <span class="text-[10px] font-bold uppercase">Google</span>
+                    </button>
+                    <button onclick="loginWithFacebook()" class="flex items-center justify-center gap-2 py-3 px-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all">
+                        <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" class="w-5 h-5">
+                        <span class="text-[10px] font-bold uppercase">Facebook</span>
+                    </button>
+                </div>
 
                 <button id="btn-toggle-auth" onclick="toggleAuthMode()" 
                         class="w-full text-[10px] text-slate-500 hover:text-blue-400 uppercase font-black tracking-[0.2em] transition-colors">
@@ -759,20 +777,36 @@ function checkAuthState() {
         const nav = document.getElementById('nav-auth');
         const params = new URLSearchParams(window.location.search);
         
-        // Nếu đang trong chế độ quét QR thì không làm gì cả, để checkCode xử lý
+        // Nếu người dùng đang quét mã QR, không xử lý giao diện Admin
         if (params.get('room')) return; 
 
         if (user) {
+            // TRƯỜNG HỢP: ĐÃ ĐĂNG NHẬP
             showView('admin');
             const displayName = user.email.replace('@scheck.pro', '');
-            nav.innerHTML = `<button onclick="auth.signOut()" class="text-[10px] font-black text-red-500 uppercase bg-white/5 px-4 py-2 rounded-xl">Thoát (${displayName})</button>`;
-            document.getElementById('admin-fields-list').innerHTML = "";
-            addField("Họ và Tên"); addField("Lớp / Phòng ban");
+            
+            // Cập nhật nút Thoát và thêm lệnh tải lại trang khi thoát để làm sạch bộ nhớ
+            nav.innerHTML = `
+                <button onclick="auth.signOut().then(() => location.reload())" 
+                        class="text-[10px] font-black text-red-500 uppercase bg-white/5 px-4 py-2 rounded-xl transition-all active:scale-90">
+                    Thoát (${displayName})
+                </button>`;
+
+            // Khởi tạo các ô nhập liệu mặc định nếu chưa có
+            const fieldList = document.getElementById('admin-fields-list');
+            if (fieldList && fieldList.children.length === 0) {
+                fieldList.innerHTML = "";
+                addField("Họ và Tên"); 
+                addField("Lớp / Phòng ban");
+            }
         } else {
+            // TRƯỜNG HỢP: ĐÃ THOÁT (Hoặc chưa đăng nhập)
             showView('auth');
+            
+            // QUAN TRỌNG: Xóa sạch nút "Thoát" khỏi thanh điều hướng
+            nav.innerHTML = ""; 
         }
         
-        // Xong xuôi thì ẩn loader
         hideInitialLoader();
     });
 }
@@ -906,13 +940,62 @@ async function handleAuth() {
     const input = document.getElementById('auth-identifier').value.trim();
     const pass = document.getElementById('auth-password').value.trim();
     const confirmPass = document.getElementById('auth-confirm-password').value.trim();
-    if (!input || !pass) return showToast("Nhập đủ thông tin!", "info");
-    if(!isLoginMode && pass !== confirmPass) return showToast("Mật khẩu không khớp!", "error");
+    const btn = document.querySelector('button[onclick="handleAuth()"]');
+    
+    if (!input || !pass) return showToast("Vui lòng nhập đủ thông tin!", "info");
+    
+    // Nếu đang ở chế độ Đăng ký, kiểm tra mật khẩu xác nhận
+    if(!isLoginMode && pass !== confirmPass) {
+        return showToast("Mật khẩu xác nhận không khớp!", "error");
+    }
+    
+    // Hiệu ứng Loading cho nút
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> ĐANG XỬ LÝ...';
+    btn.disabled = true;
+
+    // Tự động thêm đuôi email nếu người dùng chỉ nhập tên
     let email = input.includes('@') ? input : input + "@scheck.pro";
+    
     try {
-        if (isLoginMode) { await auth.signInWithEmailAndPassword(email, pass); }
-        else { await auth.createUserWithEmailAndPassword(email, pass); showToast("Đăng ký thành công!", "success"); }
-    } catch (e) { showToast(e.message, "error"); }
+        if (isLoginMode) { 
+            // CHẾ ĐỘ ĐĂNG NHẬP
+            await auth.signInWithEmailAndPassword(email, pass); 
+        } else { 
+            // CHẾ ĐỘ ĐĂNG KÝ
+            await auth.createUserWithEmailAndPassword(email, pass); 
+            showToast("Đăng ký tài khoản thành công!", "success"); 
+        }
+    } catch (e) { 
+        // --- XỬ LÝ LỖI SANG TIẾNG VIỆT ---
+        let errorMsg = "Lỗi hệ thống!";
+        
+        switch (e.code) {
+            case 'auth/email-already-in-use':
+                errorMsg = "Tài khoản này đã tồn tại! Vui lòng nhấn 'Đăng nhập' ở dưới.";
+                break;
+            case 'auth/wrong-password':
+                errorMsg = "Sai mật khẩu! Vui lòng thử lại.";
+                break;
+            case 'auth/user-not-found':
+                errorMsg = "Tài khoản này chưa được đăng ký.";
+                break;
+            case 'auth/invalid-email':
+                errorMsg = "Định dạng tài khoản không hợp lệ.";
+                break;
+            case 'auth/weak-password':
+                errorMsg = "Mật khẩu quá yếu (cần ít nhất 6 ký tự).";
+                break;
+            default:
+                errorMsg = "Lỗi: " + e.message;
+        }
+        
+        showToast(errorMsg, "error"); 
+    } finally {
+        // Trả lại trạng thái nút
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
 }
 
 function toggleAuthMode() {
@@ -1154,37 +1237,6 @@ window.onload = () => {
     }
 };
 
-async function handleAuth() {
-    const input = document.getElementById('auth-identifier').value.trim();
-    const pass = document.getElementById('auth-password').value.trim();
-    const confirmPass = document.getElementById('auth-confirm-password').value.trim();
-    const btn = document.querySelector('button[onclick="handleAuth()"]');
-    
-    if (!input || !pass) return showToast("Nhập đủ thông tin!", "info");
-    if(!isLoginMode && pass !== confirmPass) return showToast("Mật khẩu không khớp!", "error");
-    
-    // Hiệu ứng Loading
-    const originalText = btn.innerHTML;
-    btn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> ĐANG XỬ LÝ...';
-    btn.disabled = true;
-
-    let email = input.includes('@') ? input : input + "@scheck.pro";
-    
-    try {
-        if (isLoginMode) { 
-            await auth.signInWithEmailAndPassword(email, pass); 
-        } else { 
-            await auth.createUserWithEmailAndPassword(email, pass); 
-            showToast("Đăng ký thành công!", "success"); 
-        }
-    } catch (e) { 
-        showToast(e.message, "error"); 
-    } finally {
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-    }
-}
-
 // --- XỬ LÝ PHÍM ENTER ---
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
@@ -1314,6 +1366,30 @@ async function restoreSession(code) {
         closeHistory();
         showToast("Đã khôi phục!", "success");
     }
+}
+
+// Đăng nhập bằng Google
+function loginWithGoogle() {
+    const provider = new firebase.auth.GoogleAuthProvider();
+    auth.signInWithPopup(provider)
+        .then((result) => {
+            showToast("Đăng nhập Google thành công!", "success");
+        })
+        .catch((error) => {
+            showToast("Lỗi: " + error.message, "error");
+        });
+}
+
+// Đăng nhập bằng Facebook
+function loginWithFacebook() {
+    const provider = new firebase.auth.FacebookAuthProvider();
+    auth.signInWithPopup(provider)
+        .then((result) => {
+            showToast("Đăng nhập Facebook thành công!", "success");
+        })
+        .catch((error) => {
+            showToast("Lỗi: " + error.message, "error");
+        });
 }
 
 </script>
