@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>S-CHECK Pro • Digital Attendance</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-auth-compat.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+
+/* Hiệu ứng click chung cho tất cả các nút */
+button {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    position: relative;
+    overflow: hidden;
+    user-select: none;
+    touch-action: manipulation;
+}
+
+/* Khi nhấn xuống: Co lại và mờ đi một chút */
+button:active {
+    transform: scale(0.92) !important;
+    filter: brightness(0.8);
+}
+
+/* Hiệu ứng lấp lánh khi click cho các nút có class .btn-glow */
+.btn-glow::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 5px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.5);
+    opacity: 0;
+    border-radius: 100%;
+    transform: scale(1, 1) translate(-50%);
+    transform-origin: 50% 50%;
+}
+
+.btn-glow:active::after {
+    animation: ripple 0.4s ease-out;
+}
+
+@keyframes ripple {
+    0% { transform: scale(0, 0); opacity: 0.5; }
+    100% { transform: scale(40, 40); opacity: 0; }
+}
+
+/* Ghi đè hiệu ứng hover cũ để tránh bị giật khi click */
+button:hover {
+    transform: translateY(-2px);
+}
+
+/* Tắt hiệu ứng glass mặc định của tr để chuyển sang td */
+tr.glass { background: none !important; border: none !important; box-shadow: none !important; }
+
+/* Tạo hiệu ứng card cho các ô td ghép lại */
+.glass-left, .glass-mid, .glass-right {
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(25px);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 15px !important;
+}
+
+.glass-left, .glass-mid {
+    border-right: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.glass-left { 
+    border-left: 1px solid rgba(255, 255, 255, 0.08); 
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
+}
+
+.field-input {
+    padding-right: 40px !important; /* Tạo khoảng trống cho nút X */
+}
+
+.glass-right { 
+    border-right: 1px solid rgba(255, 255, 255, 0.08); 
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+}
+
+/* Header cũng cần đường kẻ ngăn cách nếu muốn đồng bộ */
+#table-head th:not(:last-child) {
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Khoảng cách giữa các hàng */
+#table-body tr {
+    display: table-row;
+}
+
+#table-body tr:hover td {
+    background: rgba(30, 41, 59, 0.8);
+    transition: background 0.3s ease;
+}
+
+#table-body {
+    border-spacing: 0 12px;
+    border-collapse: separate;
+}
+
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0 12px;
+    table-layout: auto; /* Tự động dãn theo nội dung */
+    min-width: 100%;    /* Luôn chiếm ít nhất 100% chiều rộng */
+}
+
+/* Cấu hình độ rộng từng cột */
+.col-delete { width: 50px; min-width: 50px; }
+.col-stt { width: 60px; min-width: 60px; text-align: center !important; }
+.col-time { width: 180px; min-width: 180px; }
+.col-dynamic { width: auto; } /* Các cột thông tin tự dãn */
+
+/* Header */
+#table-head th {
+    padding: 10px 15px;
+    text-align: center; /* Đổi thành center để căn giữa toàn bộ tiêu đề */
+    vertical-align: middle;
+}
+
+/* Ép các hàng tr hiển thị như một khối thống nhất */
+tr.glass {
+    display: table-row; /* Đảm bảo cấu trúc table chuẩn */
+}
+
+/* Đảm bảo td cuối cùng nhận border-radius nếu cần (tùy chọn) */
+tr.glass td:last-child {
+    border-top-right-radius: 20px;
+    border-bottom-right-radius: 20px;
+}
+tr.glass td:first-child {
+    border-top-left-radius: 20px;
+    border-bottom-left-radius: 20px;
+}
+
+/* Hỗ trợ cuộn ngang cho bảng báo cáo */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: visible; /* Quan trọng: Để sóng radar lan ra ngoài không bị mất */
+    margin-left: -10px;
+    padding: 20px 0; /* Thêm padding đệm */
+}
+
+/* Xóa bỏ nền mặc định của tr khi ở trạng thái radar để nó không tạo thành một cái dải đen hẹp */
+#table-body tr td.bg-transparent {
+    background: transparent !important;
+    border: none !important;
+    backdrop-filter: none !important;
+}
+
+/* Ngăn chặn nội dung tràn ô */
+table th, table td {
+    white-space: nowrap; /* Ép chữ trên 1 dòng */
+    padding: 15px 25px !important; /* Tăng padding để thoáng hơn */
+    text-align: left;
+}
+
+/* Riêng các cột động (nơi chứa tên, lớp) có thể ưu tiên rộng hơn */
+.col-dynamic { 
+    width: auto; 
+    min-width: 150px; 
+}
+
+/* Cột thời gian cần rộng hơn một chút */
+table th:first-child, table td:first-child {
+    min-width: 180px;
+}
+
+/* Thanh cuộn đẹp hơn */
+.table-container::-webkit-scrollbar {
+    height: 6px;
+}
+.table-container::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.3);
+    border-radius: 10px;
+}
+.table-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+        [v-cloak] { display: none; }
+        #success-overlay { position: fixed !important; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center; background: rgba(3, 7, 18, 0.95); backdrop-filter: blur(20px); overflow: hidden; }
+        #toast-container { position: fixed; top: 20px; right: 20px; z-index: 10002; display: flex; flex-direction: column; gap: 10px; }
+        .toast-item { animation: toastIn 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards; min-width: 300px; }
+        @keyframes toastIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast-out { animation: toastOut 0.5s ease forwards; }
+        @keyframes toastOut { to { transform: translateX(100%); opacity: 0; } }
+        .qr-backdrop { background-color: #000000 !important; backdrop-filter: blur(100px) !important; }
+        .qr-lightbox { background: white !important; padding: 40px !important; border-radius: 30px; box-shadow: 0 0 100px rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .success-glow { box-shadow: 0 0 100px rgba(16, 185, 129, 0.4); animation: pulse-glow 2s infinite ease-in-out; }
+        @keyframes pulse-glow { 0%, 100% { transform: scale(1); opacity: 0.8; } 50% { transform: scale(1.1); opacity: 1; } }
+        .shiny-text { position: relative; overflow: hidden; }
+        .shiny-text::after { content: ''; position: absolute; top: 0; left: -100%; width: 50%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent); animation: shine 3s infinite; }
+        @keyframes shine { 0% { left: -100%; } 20% { left: 100%; } 100% { left: 100%; } }
+        .fix-clipping { padding: 10px 20px; line-height: 1.2; }
+        :root { --primary: #6366f1; --accent: #a855f7; --bg: #030712; }
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: #f8fafc; overflow-x: hidden; min-height: 100vh; }
+        .mesh-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-color: #030712; background-image: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.15) 0px, transparent 50%), radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%), radial-gradient(at 0% 100%, rgba(244, 114, 182, 0.1) 0px, transparent 50%); filter: blur(80px); }
+        .glass { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(25px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+        .btn-glow { background: linear-gradient(135deg, var(--primary), var(--accent)); position: relative; overflow: hidden; transition: all 0.3s ease; box-shadow: 0 0 20px rgba(99, 102, 241, 0.3); }
+        .btn-glow:hover { box-shadow: 0 0 35px rgba(99, 102, 241, 0.5); transform: translateY(-2px); }
+        input { background: rgba(255, 255, 255, 0.03) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; color: white !important; outline: none !important; transition: all 0.3s ease; }
+        input:focus { border-color: var(--primary) !important; box-shadow: 0 0 15px rgba(99, 102, 241, 0.2); }
+        .page-enter { animation: slideUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+        @keyframes slideUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(0); } }
+
+        /* Animation cho Radar */
+@keyframes radar-beam {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+@keyframes radar-pulse {
+    0% { transform: scale(0.8); opacity: 0; }
+    50% { opacity: 0.4; }
+    100% { transform: scale(2.2); opacity: 0; }
+}
+.radar-container {
+    position: relative;
+    width: 220px;  /* Tăng từ 100px lên 220px */
+    height: 220px; /* Tăng từ 100px lên 220px */
+    margin: 0 auto;
+}
+.radar-circle {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(99, 102, 241, 0.3);
+    border-radius: 50%;
+}
+.radar-pulse {
+    position: absolute;
+    inset: 0;
+    border: 2px solid rgba(99, 102, 241, 0.5);
+    border-radius: 50%;
+    animation: radar-pulse 2s infinite cubic-bezier(0.21, 0.53, 0.56, 0.8);
+}
+.radar-beam {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg, transparent 80%, rgba(99, 102, 241, 0.4) 100%);
+    animation: radar-beam 3s linear infinite;
+}
+
+    </style>
+</head>
+<body>
+
+<div class="mesh-bg"></div>
+
+<!-- QR OVERLAY -->
+<div id="qr-zoom-overlay" class="fixed inset-0 z-[10001] hidden items-center justify-center qr-backdrop cursor-zoom-out" onclick="closeQRZoom()">
+    <div class="qr-lightbox" onclick="event.stopPropagation()">
+        <div id="qr-zoom-content" class="bg-white"></div>
+        <div class="text-center mt-6">
+            <h3 class="text-black text-3xl font-black uppercase tracking-tighter italic">QUÉT MÃ ĐIỂM DANH</h3>
+            <p class="text-slate-400 text-xs font-bold uppercase tracking-[5px] mt-1">S-CHECK PRO SYSTEM</p>
+        </div>
+    </div>
+</div>
+
+<!-- SUCCESS OVERLAY -->
+<div id="success-overlay" class="fixed inset-0 z-[10000] hidden flex flex-col items-center justify-center bg-[#030712]/95 backdrop-blur-2xl">
+    <div class="absolute w-64 h-64 bg-emerald-500/20 rounded-full blur-[120px] animate-pulse"></div>
+    <div class="relative text-center space-y-10 animate-in zoom-in duration-700">
+        <div class="relative mx-auto w-32 h-32">
+            <div class="absolute inset-0 bg-emerald-500 rounded-full success-glow"></div>
+            <div class="absolute inset-2 bg-[#030712] rounded-full flex items-center justify-center border-2 border-emerald-500/30">
+                <svg class="w-16 h-16 text-emerald-500 shadow-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+        </div>
+        <div class="space-y-2 fix-clipping">
+            <h2 class="text-8xl font-black italic tracking-tighter uppercase leading-none bg-gradient-to-b from-white via-white to-white/20 bg-clip-text text-transparent shiny-text">HOÀN TẤT</h2>
+            <p class="text-emerald-400 font-bold tracking-[0.5em] uppercase text-sm mt-4 opacity-90">Check-in Successful</p>
+        </div>
+        <p class="text-slate-400 text-lg font-medium">Thông tin của bạn đã được hệ thống ghi nhận</p>
+    </div>
+</div>
+
+<div class="min-h-screen flex flex-col relative z-10">
+    <nav class="h-16 lg:h-20 flex items-center justify-between px-4 lg:px-10 border-b border-white/5 backdrop-blur-2xl bg-[#030712]/80 sticky top-0 z-50">
+        <div class="flex items-center gap-2 lg:gap-3">
+            <img src="https://i.ibb.co/XfkmdYjC/LOGO-S-CHECK.png" alt="Logo" class="w-8 lg:w-12 h-8 lg:h-12 object-cover rounded-lg shadow-lg border border-white/10">
+            <div>
+                <span class="text-lg lg:text-2xl font-black tracking-tighter uppercase italic">S-CHECK</span>
+                <span class="block text-[6px] lg:text-[8px] font-black tracking-[2px] text-indigo-400 -mt-1 uppercase">Pro</span>
+            </div>
+        </div>
+        <div id="nav-auth" class="flex gap-2 lg:gap-4 text-[8px] lg:text-[10px]"></div>
+    </nav>
+
+    <main class="flex-1 w-full px-4 lg:px-10 py-8 lg:py-12 flex flex-col items-center justify-center">
+        <!-- AUTH VIEW -->
+        <!-- Thêm font và icon từ CDN -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+<div id="view-auth" class="w-full max-w-md px-4 lg:px-0 mx-auto page-enter">
+    <div class="text-center mb-8">
+        <!-- Logo với hiệu ứng đổ bóng và bo góc -->
+        <div class="relative inline-block">
+            <div class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-cyan-400 rounded-2xl blur opacity-25"></div>
+            <img src="https://i.ibb.co/XfkmdYjC/LOGO-S-CHECK.png" 
+                 class="relative w-20 lg:w-28 h-20 lg:h-28 mx-auto mb-4 rounded-2xl border border-white/20 shadow-2xl object-cover">
+        </div>
+        <h1 id="auth-title" class="text-3xl lg:text-4xl font-black uppercase tracking-tighter italic bg-gradient-to-br from-white to-gray-400 bg-clip-text text-transparent">
+            Quản trị viên
+        </h1>
+        <p id="auth-subtitle" class="text-slate-400 text-xs mt-2 uppercase tracking-[0.2em]">Hệ thống bảo mật cao</p>
+    </div>
+
+    <!-- Card Container -->
+    <div class="relative group">
+        <!-- Hiệu ứng viền phát sáng chạy quanh -->
+        <div class="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-[2rem] blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+        
+        <div class="glass relative p-8 lg:p-10 rounded-[2rem] border border-white/10 shadow-2xl backdrop-blur-xl bg-black/40 space-y-5">
+            
+            <!-- Input Email/SĐT -->
+            <div class="space-y-1">
+                <label class="text-[10px] text-slate-400 ml-2 uppercase font-bold tracking-widest">Tài khoản</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-500">
+                        <i class="fa-solid fa-user-shield"></i>
+                    </span>
+                    <input type="text" id="auth-identifier" placeholder="Email hoặc SĐT" 
+                           class="w-full pl-11 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-white placeholder:text-slate-600">
+                </div>
+            </div>
+
+            <!-- Input Mật khẩu -->
+            <div class="space-y-1">
+                <label class="text-[10px] text-slate-400 ml-2 uppercase font-bold tracking-widest">Mật khẩu</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-500">
+                        <i class="fa-solid fa-lock"></i>
+                    </span>
+                    <input type="password" id="auth-password" placeholder="••••••••" 
+                           class="w-full pl-11 pr-12 py-4 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-white placeholder:text-slate-600">
+                    <button type="button" onclick="togglePassword('auth-password')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white transition-colors">
+                        <i class="fa-solid fa-eye text-sm"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Input Xác nhận mật khẩu (Sẽ hiện khi Đăng ký) -->
+            <div id="confirm-password-container" class="space-y-1 hidden overflow-hidden transition-all duration-500 ease-in-out shadow-inner">
+                <label class="text-[10px] text-slate-400 ml-2 uppercase font-bold tracking-widest text-blue-400">Xác nhận mật khẩu</label>
+                <div class="relative">
+                    <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-blue-400">
+                        <i class="fa-solid fa-check-double"></i>
+                    </span>
+                    <input type="password" id="auth-confirm-password" placeholder="••••••••" 
+                           class="w-full pl-11 pr-4 py-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white">
+                </div>
+            </div>
+
+            <!-- Nút Action -->
+            <div class="pt-4 space-y-4">
+                <button onclick="handleAuth()" class="group relative w-full overflow-hidden rounded-2xl bg-blue-600 px-8 py-4 text-white transition-all hover:bg-blue-500 active:scale-95 active:shadow-inner">
+                    <div class="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:animate-[shimmer_2s_infinite]"></div>
+                    <span id="btn-auth-text" class="relative font-black uppercase tracking-widest text-xs">Đăng nhập ngay</span>
+                </button>
+
+                <button id="btn-toggle-auth" onclick="toggleAuthMode()" 
+                        class="w-full text-[10px] text-slate-500 hover:text-blue-400 uppercase font-black tracking-[0.2em] transition-colors">
+                    Chưa có tài khoản? <span class="text-blue-500">Đăng ký</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Footer nhỏ -->
+    <p class="text-center mt-8 text-[9px] text-slate-600 uppercase tracking-widest">Security System v2.0 &copy; 2026</p>
+</div>
+
+        <!-- USER VIEW -->
+        <div id="view-user" class="w-full max-w-xl px-2 lg:px-0 page-enter hidden pb-6 lg:pb-0 mx-auto">
+            <div id="u-step-1" class="space-y-10 text-center pt-10">
+                <h1 class="text-4xl lg:text-7xl font-black uppercase italic bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">Check-in</h1>
+                <div class="glass p-6 lg:p-10 rounded-3xl space-y-8">
+                    <input type="text" id="u-code-input" placeholder="MÃ PHÒNG" class="w-full p-8 text-4xl font-black tracking-[10px] rounded-3xl uppercase text-center">
+                    <button onclick="checkCode()" class="btn-glow w-full py-6 rounded-3xl uppercase font-black text-lg">Bắt đầu</button>
+                </div>
+            </div>
+            <div id="u-step-2" class="glass p-6 lg:p-10 rounded-3xl space-y-8 hidden">
+                <div class="flex justify-between items-center border-b border-white/5 pb-4">
+                    <span id="u-title" class="text-lg font-black text-indigo-400 uppercase italic"></span>
+                    <button onclick="location.reload()" class="w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-slate-500">✕</button>
+                </div>
+                <div id="u-form" class="space-y-4"></div>
+                <button onclick="submitAttendance()" class="btn-glow w-full py-4 rounded-2xl uppercase font-black text-xl">Xác nhận</button>
+            </div>
+        </div>
+
+<!-- ADMIN VIEW -->
+<div id="view-admin" class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 page-enter hidden items-start">
+    <!-- CỘT TRÁI: TẠO SỰ KIỆN -->
+    <div class="lg:col-span-4 space-y-6">
+        <div class="glass p-6 lg:p-8 rounded-3xl">
+            <h3 class="text-xs font-black text-indigo-400 uppercase mb-6 tracking-[2px] italic border-l-2 border-indigo-500 pl-3">Tạo sự kiện</h3>
+            <div class="space-y-4">
+                <input type="text" id="a-code" placeholder="MÃ PHÒNG" class="w-full p-3 rounded-xl font-black uppercase text-center">
+                <input type="text" id="a-title" placeholder="TÊN SỰ KIỆN" class="w-full p-3 rounded-xl font-bold">
+                <input type="number" id="a-duration" placeholder="THỜI GIAN (PHÚT)" class="w-full p-3 rounded-xl font-bold">
+                <div id="admin-fields-list" class="space-y-2 bg-white/5 p-4 rounded-2xl max-h-[30vh] overflow-y-auto"></div>
+                <button onclick="addField()" class="w-full py-2 border border-white/10 rounded-xl text-[10px] font-black text-slate-400">+ Thêm</button>
+                <button onclick="activateSession()" class="btn-glow w-full py-4 rounded-2xl text-white font-black uppercase text-xs">Kích hoạt</button>
+            </div>
+        </div>
+<!-- QR CODE SECTION -->
+<div id="qr-container" class="glass p-6 lg:p-8 rounded-3xl text-center hidden border border-indigo-500/20 relative overflow-hidden group">
+    <!-- Hiệu ứng tia sáng quét (Scan animation) -->
+    <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-indigo-500 to-transparent opacity-50 animate-[scan_2s_linear_infinite]"></div>
+    
+    <style>
+        @keyframes scan {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(400px); }
+        }
+         /* Hiệu ứng mờ Glassmorphism */
+    .glass {
+        background: rgba(15, 23, 42, 0.6);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+    }
+
+    /* Animation cho luồng sáng chạy qua nút */
+    @keyframes shimmer {
+        100% { transform: translateX(100%); }
+    }
+
+    /* Animation khi hiện input mới */
+    .show-confirm {
+        display: block !important;
+        animation: slideDown 0.4s ease forwards;
+    }
+
+    @keyframes slideDown {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    </style>
+
+    <!-- Tiêu đề nhỏ phía trên -->
+    <div class="flex items-center justify-center gap-2 mb-6">
+        <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h.01M16 20h2a2 2 0 002-2v-2M16 4h2a2 2 0 012 2v2m-6 12H8a2 2 0 01-2-2v-2M8 4H6a2 2 0 00-2 2v2m0 10v2a2 2 0 002 2h2"></path>
+        </svg>
+        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-[3px]">Cổng Điểm Danh QR</span>
+    </div>
+
+    <!-- Vùng hiển thị mã QR -->
+    <div class="relative inline-block group/qr">
+        <div id="qr-code" class="bg-white p-3 rounded-[2rem] shadow-[0_0_50px_rgba(99,102,241,0.2)] transition-transform duration-500 group-hover/qr:scale-[1.02] cursor-zoom-in" onclick="zoomQR()">
+            <!-- Ảnh QR sẽ render ở đây -->
+        </div>
+        
+        <!-- Icon phóng to nhỏ hiện ra khi hover -->
+        <div class="absolute inset-0 flex items-center justify-center opacity-0 group-hover/qr:opacity-100 transition-opacity pointer-events-none">
+            <div class="bg-black/60 backdrop-blur-md p-3 rounded-full">
+                <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7"></path>
+                </svg>
+            </div>
+        </div>
+    </div>
+
+    <!-- Thông tin Room Code bên dưới QR -->
+    <div class="mt-6 space-y-1">
+        <p id="display-room-code" class="text-2xl font-black text-white tracking-[5px] italic"></p>
+    </div>
+
+    <!-- Nút Tải về Pro -->
+    <button onclick="downloadQR()" class="mt-8 w-full group/btn relative overflow-hidden py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 transition-all hover:bg-white/10 hover:border-indigo-500/50">
+        <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover/btn:opacity-100 transition-opacity"></div>
+        
+        <svg class="w-5 h-5 text-indigo-400 group-hover/btn:translate-y-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+        </svg>
+        
+        <span class="text-xs font-black text-white uppercase tracking-wider relative z-10">Tải mã QR (PNG)</span>
+    </button>
+</div>
+</div>
+
+    <!-- CỘT PHẢI: BÁO CÁO -->
+    <div class="lg:col-span-8 glass p-6 lg:p-10 rounded-3xl min-h-[600px] flex flex-col"> 
+        <div class="flex justify-between items-center mb-6 lg:mb-10">
+            <h2 id="report-title" class="text-2xl font-black italic uppercase">Báo cáo</h2>
+            <div class="flex gap-2">
+                <button onclick="showSheetSync()" class="text-[10px] font-black text-emerald-400 uppercase border border-emerald-400/20 px-3 py-2 rounded-xl hover:bg-emerald-400/10 flex items-center gap-2">
+                    <img src="https://upload.wikimedia.org/wikipedia/commons/3/30/Google_Sheets_logo_%282014-2020%29.svg" class="w-3 h-3"> Mở Sheet
+                </button>
+                <button onclick="clearLogs()" class="text-[10px] font-black text-red-500 uppercase border border-red-500/20 px-3 py-2 rounded-xl hover:bg-red-500/10">🗑 Xóa</button>
+            </div>
+        </div>
+        <div class="table-container flex-1 flex items-center justify-center">
+            <table class="w-full text-left border-separate border-spacing-y-2">
+                <thead id="table-head" class="text-slate-500 text-[10px] uppercase font-black tracking-widest"></thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div id="toast-container"></div>
+<div id="confirm-modal" class="fixed inset-0 z-[10003] hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div class="glass p-8 rounded-[32px] max-w-sm w-full text-center border border-white/10">
+        <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 text-2xl">⚠️</div>
+        <h3 class="text-xl font-black uppercase italic mb-2">Xác nhận</h3>
+        <p id="confirm-msg" class="text-slate-400 text-sm mb-8"></p>
+        <div class="flex gap-3">
+            <button onclick="closeConfirm(false)" class="flex-1 py-3 rounded-xl font-bold bg-white/5 hover:bg-white/10 uppercase text-[10px]">Hủy</button>
+            <button id="confirm-btn-yes" class="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 uppercase text-[10px]">Đồng ý</button>
+        </div>
+    </div>
+</div>
+
+<!-- THANH BĂNG CỐ ĐỊNH DƯỚI ĐÁY MÀN HÌNH -->
+<div class="fixed bottom-0 left-0 right-0 bg-slate-950/40 backdrop-blur-md border-t border-white/5 py-1.5 z-[9999] pointer-events-none">
+    <p class="text-[9px] text-slate-500/80 uppercase tracking-[2px] text-center flex items-center justify-center gap-2">
+        <span>© 2026</span> 
+        <span class="w-[1px] h-2 bg-white/10"></span> 
+        <span>Thiết kế bởi <b class="text-indigo-400/70 font-extrabold">Cao Nguyễn Hồng Phi</b></span>
+    </p>
+</div>
+
+<script>
+// --- CONFIG FIREBASE ---
+const firebaseConfig = {
+    apiKey: "AIzaSyBdg-r3IsGAH_TzN4vR4M5UZGpN43IcK3s",
+    authDomain: "fir-s-check-pro.firebaseapp.com",
+    databaseURL: "https://fir-s-check-pro-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "fir-s-check-pro",
+    storageBucket: "fir-s-check-pro.firebasestorage.app",
+    messagingSenderId: "161970531942",
+    appId: "1:161970531942:web:f16e1559dcb91bd2dac7a7"
+};
+
+// LINK GOOGLE SCRIPT MỚI CỦA BẠN
+const MASTER_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvjeP0EV_xTsbrmftVyq2DcuJyZT34WHt4PT4H9Y-XSFP1NKd-fxw2YGe-o0PNXRppvg/exec";
+
+firebase.initializeApp(firebaseConfig);
+const rdb = firebase.database();
+const auth = firebase.auth();
+
+let isLoginMode = true;
+let currentSession = null;
+let userSession = null;
+let lastQRUrl = "";
+let confirmCallback = null;
+
+// 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
+async function activateSession() {
+    const code = document.getElementById('a-code').value.trim().toUpperCase();
+    const title = document.getElementById('a-title').value.trim();
+    const duration = parseInt(document.getElementById('a-duration').value);
+    const fields = Array.from(document.querySelectorAll('.field-input')).map(i => i.value.trim()).filter(v => v);
+    
+    if(!code || !title || !duration) return showToast("Điền đủ thông tin!", "info");
+    showToast("Đang tạo Google Sheets...", "info");
+
+    try {
+        const query = new URLSearchParams({ action: "create", title: title, fields: JSON.stringify(fields) });
+        const response = await fetch(`${MASTER_SCRIPT_URL}?${query.toString()}`);
+        const sheetUrl = await response.text();
+        
+        if (!sheetUrl.startsWith("http")) throw new Error(sheetUrl);
+
+        const expiryTime = Date.now() + (duration * 60 * 1000);
+        const sessionData = { code, title, fields, sheetUrl, expiryTime, ts: Date.now() };
+
+        await rdb.ref('dynamic_attendance/sessions/' + code).set(sessionData);
+        currentSession = sessionData;
+        
+        showToast("Đã tạo Sheet & Kích hoạt!", "success");
+        let roomUrl = window.location.href.split('?')[0] + "?room=" + code;
+        lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
+        document.getElementById('qr-container').classList.remove('hidden');
+        document.getElementById('qr-code').innerHTML = `<img src="${lastQRUrl}" class="w-48 h-48 mx-auto rounded-2xl">`;
+        listenLogs(code);
+    } catch (e) {
+        showToast("Lỗi: Kiểm tra lại Deploy 'Anyone'", "error");
+    }
+}
+
+// 2. GỬI ĐIỂM DANH & CẬP NHẬT SHEET (GET - NO CORS)
+async function submitAttendance() {
+    const vals = Array.from(document.querySelectorAll('.u-input')).map(i => i.value.trim());
+    if(vals.some(v => !v)) return showToast("Điền đủ thông tin!", "info");
+    
+    const time = new Date().toLocaleString('vi-VN');
+    const log = { values: vals, time: time, ts: Date.now() };
+
+    // Lưu Firebase
+    rdb.ref('dynamic_attendance/logs/' + userSession.code).push(log);
+
+    // Cập nhật Google Sheet Real-time
+    const updateUrl = MASTER_SCRIPT_URL + "?action=update" + 
+                      "&sheetUrl=" + encodeURIComponent(userSession.sheetUrl) + 
+                      "&time=" + encodeURIComponent(time) + 
+                      "&values=" + encodeURIComponent(JSON.stringify(vals));
+    
+    fetch(updateUrl, { mode: 'no-cors' });
+
+    document.getElementById('success-overlay').style.display = 'flex';
+    confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+}
+
+// 3. MỞ TRANG TÍNH (MỞ LINK TRỰC TIẾP)
+function showSheetSync() {
+    if (!currentSession || !currentSession.sheetUrl) return showToast("Kích hoạt sự kiện trước!", "error");
+    window.open(currentSession.sheetUrl, "_blank");
+}
+
+// --- LOGIC GIAO DIỆN & AUTH ---
+function checkAuthState() {
+    auth.onAuthStateChanged(user => {
+        const nav = document.getElementById('nav-auth');
+        if (user) {
+            showView('admin');
+            // Xử lý để lấy ID gốc: Nếu chứa @scheck.pro thì xóa đi, nếu là gmail thật thì giữ nguyên
+            const displayName = user.email.replace('@scheck.pro', '');
+            
+            nav.innerHTML = `<button onclick="auth.signOut()" class="text-[10px] font-black text-red-500 uppercase bg-white/5 px-4 py-2 rounded-xl">Thoát (${displayName})</button>`;
+            
+            document.getElementById('admin-fields-list').innerHTML = "";
+            addField("Họ và Tên"); addField("Lớp / Phòng ban");
+        } else {
+            showView('auth');
+            nav.innerHTML = ``; // Đã xóa nút Điểm danh
+        }
+    });
+}
+
+function checkCode(forced = null) {
+    const code = forced || document.getElementById('u-code-input').value.trim().toUpperCase();
+    if(!code) return;
+    rdb.ref('dynamic_attendance/sessions/' + code).once('value', snap => {
+        if(!snap.exists()) return showToast("Mã phòng sai!", "error");
+        userSession = snap.val();
+        if (Date.now() > userSession.expiryTime) return showToast("Hết thời gian!", "error");
+        showView('user'); // Hiện view user
+        document.getElementById('u-step-1').classList.add('hidden'); // Ẩn ô nhập mã
+        document.getElementById('u-step-2').classList.remove('hidden'); // Hiện form điền tên
+        document.getElementById('u-title').innerText = userSession.title;
+        document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
+            <div class="space-y-1">
+                <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
+                <input type="text" class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5" placeholder="Nhập ${f}...">
+            </div>`).join('');
+    });
+}
+
+function listenLogs(code) {
+    rdb.ref('dynamic_attendance/logs/' + code).on('value', snap => {
+        const body = document.getElementById('table-body');
+        const head = document.getElementById('table-head');
+        
+if(!snap.exists()) { 
+    body.innerHTML = `
+        <tr>
+            <td colspan="20" class="py-20 text-center border-none bg-transparent"> 
+                <div class="radar-container mb-10 scale-125 lg:scale-150"> <!-- Scale để radar to rõ hơn trong khung rộng -->
+                    <div class="radar-circle"></div>
+                    <div class="radar-circle" style="inset: 20%"></div>
+                    <div class="radar-circle" style="inset: 40%"></div>
+                    <div class="radar-circle" style="inset: 60%"></div>
+                    <div class="radar-pulse"></div>
+                    <div class="radar-pulse" style="animation-delay: 1s"></div>
+                    <div class="radar-beam"></div>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div class="w-3 h-3 bg-indigo-500 rounded-full shadow-[0_0_25px_rgba(99,102,241,1)]"></div>
+                    </div>
+                </div>
+                <p class="text-[12px] font-black uppercase tracking-[10px] text-indigo-400/40 animate-pulse mt-20">
+                    Hệ thống đang sẵn sàng quét tín hiệu...
+                </p>
+            </td>
+        </tr>`; 
+    return; 
+}
+
+        // 1. Header
+        let headHTML = `<tr>
+            <th class="col-delete"></th> 
+            <th class="col-stt text-slate-500 text-[10px] uppercase font-black tracking-widest">STT</th>
+            <th class="col-time text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">Dấu thời gian</th>`;
+        
+        currentSession.fields.forEach(f => {
+            headHTML += `<th class="text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">${f}</th>`;
+        });
+        headHTML += `</tr>`;
+        head.innerHTML = headHTML;
+
+        // 2. Body
+        const data = Object.entries(snap.val()); 
+        body.innerHTML = data.map(([id, l], index) => {
+            // Ô Xóa
+            let deleteCell = `
+                <td class="glass-left text-center">
+                    <button onclick="deleteLog('${id}')" 
+                            class="w-8 h-8 inline-flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg">
+                        ✕
+                    </button>
+                </td>`;
+
+            // Ô STT
+            let sttCell = `<td class="glass-mid text-slate-400 font-extrabold text-sm text-center">${index + 1}</td>`;
+
+            // Ô Thời gian
+            let timeCell = `<td class="glass-mid text-center text-[11px] font-mono text-indigo-400 italic">${l.time}</td>`;
+            
+            // Các ô động (Tự dãn theo độ dài chữ)
+            let valueCells = "";
+            currentSession.fields.forEach((field, fIndex) => {
+                let cellValue = l.values[fIndex] !== undefined ? l.values[fIndex] : "";
+                let isLast = fIndex === currentSession.fields.length - 1;
+                let cellClass = isLast ? "glass-right" : "glass-mid";
+                
+                valueCells += `<td class="${cellClass} text-sm font-bold text-white/90 uppercase">
+                                    ${cellValue}
+                               </td>`;
+            });
+
+            return `<tr class="transition-all duration-300">${deleteCell}${sttCell}${timeCell}${valueCells}</tr>`;
+        }).join('');
+    });
+}
+
+async function handleAuth() {
+    const input = document.getElementById('auth-identifier').value.trim();
+    const pass = document.getElementById('auth-password').value.trim();
+    const confirmPass = document.getElementById('auth-confirm-password').value.trim();
+    if (!input || !pass) return showToast("Nhập đủ thông tin!", "info");
+    if(!isLoginMode && pass !== confirmPass) return showToast("Mật khẩu không khớp!", "error");
+    let email = input.includes('@') ? input : input + "@scheck.pro";
+    try {
+        if (isLoginMode) { await auth.signInWithEmailAndPassword(email, pass); }
+        else { await auth.createUserWithEmailAndPassword(email, pass); showToast("Đăng ký thành công!", "success"); }
+    } catch (e) { showToast(e.message, "error"); }
+}
+
+function toggleAuthMode() {
+    isLoginMode = !isLoginMode;
+    const confirmField = document.getElementById('confirm-password-container');
+    const authTitle = document.getElementById('auth-title');
+    const btnText = document.getElementById('btn-auth-text');
+    const toggleBtn = document.getElementById('btn-toggle-auth');
+
+    if (!isLoginMode) {
+        confirmField.style.display = 'block'; // Hiện ô xác nhận mật khẩu
+        authTitle.innerText = "Tạo tài khoản";
+        btnText.innerText = "Đăng ký ngay";
+        toggleBtn.innerHTML = "Đã có tài khoản? <span class='text-blue-500'>Đăng nhập</span>";
+    } else {
+        confirmField.style.display = 'none';
+        authTitle.innerText = "Quản trị viên";
+        btnText.innerText = "Đăng nhập ngay";
+        toggleBtn.innerHTML = "Chưa có tài khoản? <span class='text-blue-500'>Đăng ký</span>";
+    }
+}
+
+function togglePassword(id) {
+    const input = document.getElementById(id);
+    const icon = event.currentTarget.querySelector('i');
+    if (input.type === "password") {
+        input.type = "text";
+        icon.classList.replace('fa-eye', 'fa-eye-slash');
+    } else {
+        input.type = "password";
+        icon.classList.replace('fa-eye-slash', 'fa-eye');
+    }
+}
+
+function showView(v) {
+    ['auth', 'admin', 'user'].forEach(i => document.getElementById(`view-${i}`).classList.add('hidden'));
+    document.getElementById(`view-${v}`).classList.remove('hidden');
+}
+
+function addField(val = "") {
+    const list = document.getElementById('admin-fields-list');
+    const div = document.createElement('div');
+    div.className = "flex gap-2 mb-2 animate-in fade-in slide-in-from-top-1"; // Thêm hiệu ứng xuất hiện cho đẹp
+    div.innerHTML = `
+        <input type="text" class="field-input flex-1 p-3 rounded-xl text-xs font-bold" value="${val}">
+        <button onclick="this.parentElement.remove()" class="text-red-500 px-3 hover:bg-red-500/10 rounded-lg transition-colors">✕</button>
+    `;
+    
+    // Thêm phần tử mới vào danh sách
+    list.appendChild(div);
+
+    // Tự động cuộn xuống đáy (sử dụng setTimeout để đảm bảo DOM đã cập nhật xong chiều cao)
+    setTimeout(() => {
+        list.scrollTo({
+            top: list.scrollHeight,
+            behavior: 'smooth'
+        });
+    }, 10);
+}
+
+function showToast(msg, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    const colors = { success: 'border-emerald-500/50 text-emerald-400', error: 'border-red-500/50 text-red-400', info: 'border-indigo-500/50 text-indigo-400' };
+    toast.className = `toast-item glass p-4 rounded-2xl border-l-4 ${colors[type]} shadow-2xl`;
+    toast.innerHTML = `<p class="text-sm font-bold text-white">${msg}</p>`;
+    container.appendChild(toast);
+    setTimeout(() => { toast.classList.add('toast-out'); setTimeout(() => toast.remove(), 500); }, 4000);
+}
+
+function showConfirm(msg, callback) {
+    document.getElementById('confirm-msg').innerText = msg;
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.remove('hidden'); modal.classList.add('flex');
+    confirmCallback = callback;
+}
+
+function closeConfirm(res) {
+    document.getElementById('confirm-modal').classList.add('hidden');
+    if(res && confirmCallback) confirmCallback();
+    confirmCallback = null;
+}
+document.getElementById('confirm-btn-yes').onclick = () => closeConfirm(true);
+
+function zoomQR() {
+    const overlay = document.getElementById('qr-zoom-overlay');
+    document.getElementById('qr-zoom-content').innerHTML = `<img src="${lastQRUrl}" class="w-[85vmin] h-[85vmin] object-contain">`;
+    overlay.classList.remove('hidden'); overlay.classList.add('flex');
+    if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+}
+
+async function downloadQR() {
+    if (!lastQRUrl) return showToast("Không có mã QR để tải!", "error");
+    
+    showToast("Đang chuẩn bị tệp...", "info");
+    try {
+        const response = await fetch(lastQRUrl);
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        
+        // Đặt tên file theo mã phòng
+        const fileName = `SCHECK_QR_${currentSession.code || 'CODE'}.png`;
+        
+        a.href = url;
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        
+        // Dọn dẹp
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast("Đã tải mã QR!", "success");
+    } catch (e) {
+        console.error(e);
+        showToast("Lỗi khi tải! Hãy nhấn giữ ảnh để lưu thủ công.", "error");
+    }
+}
+
+function closeQRZoom() {
+    document.getElementById('qr-zoom-overlay').classList.add('hidden');
+    if (document.fullscreenElement) document.exitFullscreen();
+}
+
+function handleFullscreenChange() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+        document.getElementById('qr-zoom-overlay').classList.add('hidden');
+    }
+}
+document.addEventListener('fullscreenchange', handleFullscreenChange);
+document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+
+document.addEventListener('keydown', (e) => { 
+    if (e.key === "Escape") { closeQRZoom(); closeConfirm(false); } 
+});
+
+window.onload = () => {
+    const params = new URLSearchParams(window.location.search);
+    const room = params.get('room');
+    if (room) {
+        // Đợi 500ms để đảm bảo giao diện ổn định rồi mới hiện form
+        setTimeout(() => {
+            checkCode(room.toUpperCase());
+        }, 500);
+    } else {
+        checkAuthState();
+    }
+};
+
+function deleteLog(id) { showConfirm("Xóa dòng này?", () => rdb.ref('dynamic_attendance/logs/' + currentSession.code + '/' + id).remove()); }
+function clearLogs() { showConfirm("Xóa sạch dữ liệu?", () => rdb.ref('dynamic_attendance/logs/' + currentSession.code).remove()); }
+
+async function handleAuth() {
+    const input = document.getElementById('auth-identifier').value.trim();
+    const pass = document.getElementById('auth-password').value.trim();
+    const confirmPass = document.getElementById('auth-confirm-password').value.trim();
+    const btn = document.querySelector('button[onclick="handleAuth()"]');
+    
+    if (!input || !pass) return showToast("Nhập đủ thông tin!", "info");
+    if(!isLoginMode && pass !== confirmPass) return showToast("Mật khẩu không khớp!", "error");
+    
+    // Hiệu ứng Loading
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> ĐANG XỬ LÝ...';
+    btn.disabled = true;
+
+    let email = input.includes('@') ? input : input + "@scheck.pro";
+    
+    try {
+        if (isLoginMode) { 
+            await auth.signInWithEmailAndPassword(email, pass); 
+        } else { 
+            await auth.createUserWithEmailAndPassword(email, pass); 
+            showToast("Đăng ký thành công!", "success"); 
+        }
+    } catch (e) { 
+        showToast(e.message, "error"); 
+    } finally {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }
+}
+
+// --- XỬ LÝ PHÍM ENTER ---
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        // 1. Nếu đang ở màn hình Đăng nhập (Auth)
+        const viewAuth = document.getElementById('view-auth');
+        if (viewAuth && !viewAuth.classList.contains('hidden')) {
+            handleAuth();
+            return;
+        }
+
+        // 2. Nếu đang ở màn hình Người dùng (User)
+        const viewUser = document.getElementById('view-user');
+        if (viewUser && !viewUser.classList.contains('hidden')) {
+            // Nếu đang ở Bước 1: Nhập mã phòng
+            const step1 = document.getElementById('u-step-1');
+            if (step1 && !step1.classList.contains('hidden')) {
+                checkCode();
+            } 
+            // Nếu đang ở Bước 2: Điền form thông tin
+            else {
+                submitAttendance();
+            }
+            return;
+        }
+
+        // 3. Nếu đang ở màn hình Admin (Tạo sự kiện)
+        const viewAdmin = document.getElementById('view-admin');
+        if (viewAdmin && !viewAdmin.classList.contains('hidden')) {
+            // Chỉ kích hoạt Enter khi đang focus vào các ô nhập liệu bên cột trái (Tạo sự kiện)
+            if (document.activeElement.closest('.lg\\:col-span-4')) {
+                activateSession();
+            }
+            return;
+        }
+    }
+});
+
+// Thêm rung nhẹ khi nhấn bất kỳ button nào (chỉ hoạt động trên Android/Chrome Mobile)
+document.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (navigator.vibrate) {
+            navigator.vibrate(10); // Rung nhẹ 10ms
+        }
+    });
+});
+
+</script>
+</body>
+</html>
