@@ -656,13 +656,19 @@ table th:first-child, table td:first-child {
         e.preventDefault();
     });
 
-    // 3. (Nâng cao) Tự hủy nếu cố tình mở DevTools bằng menu trình duyệt
-    // Nếu kích thước cửa sổ thay đổi bất thường (do DevTools chiếm chỗ)
+// 3. (Nâng cao) Tự hủy nếu cố tình mở DevTools bằng menu trình duyệt
+    // Đã sửa lỗi cho Mobile: Không quét resize trên điện thoại
     var threshold = 160;
     window.addEventListener('resize', function() {
-        if (window.outerWidth - window.innerWidth > threshold || 
-            window.outerHeight - window.innerHeight > threshold) {
-            destroyWeb();
+        // Kiểm tra xem có phải di động không
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        // Nếu là Desktop thì mới thực hiện quét bảo mật
+        if (!isMobile) {
+            if (window.outerWidth - window.innerWidth > threshold || 
+                window.outerHeight - window.innerHeight > threshold) {
+                destroyWeb();
+            }
         }
     });
 })();
