@@ -664,9 +664,20 @@ function checkAuthState() {
 }
 
 function checkCode(forced) {
-    if(!forced) return; // Nếu không có mã từ URL thì không làm gì cả
+    if(!forced) return; 
     
-    rdb.ref('dynamic_attendance/sessions/' + forced).once('value', snap => {
+    // Sửa lại dòng này để vừa chuyển chữ thường, vừa xóa dấu (giống createSlug)
+    let roomCode = forced.toLowerCase().trim();
+    roomCode = roomCode.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+    roomCode = roomCode.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+    roomCode = roomCode.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+    roomCode = roomCode.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+    roomCode = roomCode.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+    roomCode = roomCode.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+    roomCode = roomCode.replace(/đ/g, "d");
+    roomCode = roomCode.replace(/\s+/g, "-");
+    
+    rdb.ref('dynamic_attendance/sessions/' + roomCode).once('value', snap => {
         if(!snap.exists()) {
             showToast("Phòng không tồn tại hoặc đã bị xóa!", "error");
             setTimeout(() => { showView('auth'); }, 2000);
@@ -682,7 +693,6 @@ function checkCode(forced) {
         }
         
         showView('user');
-        // Hiển thị trực tiếp Step 2
         document.getElementById('u-step-2').classList.remove('hidden');
         document.getElementById('u-title').innerText = userSession.title;
         document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
@@ -921,12 +931,11 @@ window.onload = () => {
     const room = params.get('room');
     
     if (room) {
-        // Nếu có mã phòng trên URL (Quét QR), vào thẳng form
+        // Chuyển sang checkCode và để hàm đó tự xử lý chữ thường/hoa
         setTimeout(() => {
-            checkCode(room.toUpperCase());
+            checkCode(room); 
         }, 300);
     } else {
-        // Nếu không có mã, đưa về trang đăng nhập Admin
         checkAuthState();
     }
 };
