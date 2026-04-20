@@ -434,15 +434,18 @@ table th:first-child, table td:first-child {
                     <span id="btn-auth-text" class="relative font-black uppercase tracking-widest text-xs">Đăng nhập ngay</span>
                 </button>
 
-                <!-- Nút đăng nhập MXH -->
-                <div class="grid grid-cols-2 gap-4 mt-6">
-                    <button onclick="loginWithGoogle()" class="flex items-center justify-center gap-2 py-3 px-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all">
-                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-5 h-5">
-                        <span class="text-[10px] font-bold uppercase">Google</span>
+                <!-- Nút đăng nhập Thu gọn (Gọn gàng hơn) -->
+                <div class="grid grid-cols-2 gap-3 mt-6">
+                    <!-- BÊN TRÁI: GOOGLE -->
+                    <button onclick="loginWithGoogle()" class="flex items-center justify-center gap-2 py-3 px-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-indigo-500/20 transition-all group">
+                        <img src="https://www.svgrepo.com/show/475656/google-color.svg" class="w-4 h-4 group-hover:scale-110 transition-transform">
+                        <span class="text-[9px] font-black uppercase tracking-widest text-white/60 group-hover:text-white">Google</span>
                     </button>
-                    <button onclick="loginWithFacebook()" class="flex items-center justify-center gap-2 py-3 px-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 transition-all">
-                        <img src="https://www.svgrepo.com/show/475647/facebook-color.svg" class="w-5 h-5">
-                        <span class="text-[10px] font-bold uppercase">Facebook</span>
+
+                    <!-- BÊN PHẢI: KHÁCH -->
+                    <button onclick="loginAnonymously()" class="flex items-center justify-center gap-2 py-3 px-4 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-indigo-500/20 transition-all group">
+                        <i class="fa-solid fa-user-secret text-xs text-indigo-400/80 group-hover:scale-110 transition-transform"></i>
+                        <span class="text-[9px] font-black uppercase tracking-widest text-white/60 group-hover:text-indigo-400">Khách</span>
                     </button>
                 </div>
 
@@ -487,6 +490,7 @@ table th:first-child, table td:first-child {
                 <label class="text-[10px] font-bold text-emerald-400 uppercase">Tên sự kiện của bạn</label>
                 <input type="text" id="a-title" placeholder="VÍ DỤ: HỌP LỚP 12A1" class="w-full p-4 rounded-xl font-bold bg-white/5 border border-white/10">
                 <input type="number" id="a-duration" placeholder="THỜI GIAN (PHÚT)" class="w-full p-4 rounded-xl font-bold bg-white/5 border border-white/10">
+                <textarea id="a-desc" placeholder="MÔ TẢ NGẮN GỌN VỀ SỰ KIỆN..." class="w-full p-3 rounded-xl text-xs font-bold bg-white/5 border border-white/10 h-20 resize-none"></textarea>
                 <div id="admin-fields-list" class="space-y-2 bg-white/5 p-4 rounded-2xl max-h-[30vh] overflow-y-auto"></div>
                 <button onclick="addField()" class="w-full py-2 border border-white/10 rounded-xl text-[10px] font-black text-slate-400">+ Thêm</button>
                 <button onclick="activateSession()" class="btn-glow w-full py-4 rounded-2xl text-white font-black uppercase text-xs">Kích hoạt</button>
@@ -703,14 +707,14 @@ function createSlug(str) {
 // 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
 async function activateSession() {
     const title = document.getElementById('a-title').value.trim();
+    const location = document.getElementById('a-location').value.trim();
+    const desc = document.getElementById('a-desc').value.trim();
     const duration = parseInt(document.getElementById('a-duration').value);
     const fields = Array.from(document.querySelectorAll('.field-input')).map(i => i.value.trim()).filter(v => v);
     
     if(!title || !duration) return showToast("Vui lòng nhập tên sự kiện và thời gian!", "info");
     
-    // TỰ TẠO MÃ TỪ TÊN SỰ KIỆN
     const code = createSlug(title); 
-    
     showToast("Đang khởi tạo hệ thống...", "info");
 
     try {
@@ -718,27 +722,27 @@ async function activateSession() {
         const response = await fetch(`${MASTER_SCRIPT_URL}?${query.toString()}`);
         const sheetUrl = await response.text();
         
-        if (!sheetUrl.startsWith("http")) throw new Error(sheetUrl);
-
         const expiryTime = Date.now() + (duration * 60 * 1000);
-        const sessionData = { code, title, fields, sheetUrl, expiryTime, ts: Date.now() };
+        const sessionData = { 
+            code, title, location, desc, fields, sheetUrl, expiryTime, 
+            ts: Date.now(),
+            adminEmail: auth.currentUser.email 
+        };
 
-        // Lưu vào Firebase với mã tự tạo
         await rdb.ref('dynamic_attendance/sessions/' + code).set(sessionData);
         currentSession = sessionData;
         
         showToast("Đã kích hoạt thành công!", "success");
-
-        // Tạo link QR
+        // ... phần tạo QR giữ nguyên ...
         let roomUrl = window.location.origin + window.location.pathname + "?room=" + code;
         lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
-        
         document.getElementById('qr-container').classList.remove('hidden');
         document.getElementById('qr-code').innerHTML = `<img src="${lastQRUrl}" class="w-48 h-48 mx-auto rounded-2xl border-4 border-white">`;
+        document.getElementById('display-room-code').innerText = code.toUpperCase();
         
         listenLogs(code);
     } catch (e) {
-        showToast("Lỗi kết nối Google Sheet!", "error");
+        showToast("Lỗi kết nối!", "error");
     }
 }
 
@@ -748,7 +752,20 @@ async function submitAttendance() {
     if(vals.some(v => !v)) return showToast("Điền đủ thông tin!", "info");
     
     const time = new Date().toLocaleString('vi-VN');
-    const log = { values: vals, time: time, ts: Date.now() };
+    
+    // MỚI: Thu thập thông tin chi tiết thiết bị
+    const deviceInfo = {
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        screen: `${window.screen.width}x${window.screen.height}`
+    };
+
+    const log = { 
+        values: vals, 
+        time: time, 
+        ts: Date.now(),
+        device: deviceInfo // Lưu vào Firebase
+    };
 
     // Lưu Firebase
     rdb.ref('dynamic_attendance/logs/' + userSession.code).push(log);
@@ -783,13 +800,15 @@ function checkAuthState() {
         if (user) {
             // TRƯỜNG HỢP: ĐÃ ĐĂNG NHẬP
             showView('admin');
-            const displayName = user.email.replace('@scheck.pro', '');
             
-            // Cập nhật nút Thoát và thêm lệnh tải lại trang khi thoát để làm sạch bộ nhớ
+            // Xử lý tên hiển thị
+            let nameDisplay = user.isAnonymous ? "Khách (Ẩn danh)" : (user.displayName || user.email.split('@')[0]);
+            
+            // Cập nhật nút Thoát lên thanh Nav (XÓA DÒNG CLEAR SAI Ở ĐÂY)
             nav.innerHTML = `
                 <button onclick="auth.signOut().then(() => location.reload())" 
-                        class="text-[10px] font-black text-red-500 uppercase bg-white/5 px-4 py-2 rounded-xl transition-all active:scale-90">
-                    Thoát (${displayName})
+                        class="text-[10px] font-black text-red-500 uppercase bg-white/5 px-4 py-2 rounded-xl transition-all active:scale-90 border border-red-500/20 hover:bg-red-500/10">
+                    Thoát [ ${nameDisplay} ]
                 </button>`;
 
             // Khởi tạo các ô nhập liệu mặc định nếu chưa có
@@ -800,11 +819,9 @@ function checkAuthState() {
                 addField("Lớp / Phòng ban");
             }
         } else {
-            // TRƯỜNG HỢP: ĐÃ THOÁT (Hoặc chưa đăng nhập)
+            // TRƯỜNG HỢP: CHƯA ĐĂNG NHẬP
             showView('auth');
-            
-            // QUAN TRỌNG: Xóa sạch nút "Thoát" khỏi thanh điều hướng
-            nav.innerHTML = ""; 
+            nav.innerHTML = ""; // Xóa nút thoát khi đã logout
         }
         
         hideInitialLoader();
@@ -846,7 +863,11 @@ function checkCode(forced) {
         
         // Render form thông tin
         document.getElementById('u-step-2').classList.remove('hidden');
-        document.getElementById('u-title').innerText = userSession.title;
+        document.getElementById('u-title').innerHTML = `
+            <div>${userSession.title}</div>
+            <div class="text-[10px] text-slate-400 mt-1 italic">📍 ${userSession.location || 'Không xác định'}</div>
+            <div class="text-[9px] text-slate-500 font-normal normal-case mt-2">${userSession.desc || ''}</div>
+        `;
         document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
             <div class="space-y-1">
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
@@ -896,7 +917,7 @@ if(!snap.exists()) {
             <th class="col-time text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">Dấu thời gian</th>`;
         
         currentSession.fields.forEach(f => {
-            headHTML += `<th class="text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">${f}</th>`;
+            headHTML += `<th class="text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">Chi tiết</th></tr>`;
         });
         headHTML += `</tr>`;
         head.innerHTML = headHTML;
@@ -918,6 +939,13 @@ if(!snap.exists()) {
 
             // Ô Thời gian
             let timeCell = `<td class="glass-mid text-center text-[11px] font-mono text-indigo-400 italic">${l.time}</td>`;
+
+            let infoBtn = `
+            <td class="glass-right text-center">
+                <button onclick="viewDeviceInfo('${id}')" class="text-indigo-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-circle-info"></i>
+                </button>
+            </td>`;
             
             // Các ô động (Tự dãn theo độ dài chữ)
             let valueCells = "";
@@ -996,6 +1024,18 @@ async function handleAuth() {
         btn.innerHTML = originalText;
         btn.disabled = false;
     }
+}
+
+function viewDeviceInfo(logId) {
+    rdb.ref(`dynamic_attendance/logs/${currentSession.code}/${logId}`).once('value', snap => {
+        const data = snap.val();
+        if(!data.device) return showToast("Không có dữ liệu thiết bị", "info");
+        
+        const msg = `Thiết bị: ${data.device.platform}\nKích thước màn hình: ${data.device.screen}\nTrình duyệt: ${data.device.userAgent.substring(0, 50)}...`;
+        
+        // Bạn có thể dùng showConfirm hoặc alert để hiện nhanh
+        alert("CHI TIẾT THIẾT BỊ:\n" + msg);
+    });
 }
 
 function toggleAuthMode() {
@@ -1380,15 +1420,23 @@ function loginWithGoogle() {
         });
 }
 
-// Đăng nhập bằng Facebook
-function loginWithFacebook() {
-    const provider = new firebase.auth.FacebookAuthProvider();
-    auth.signInWithPopup(provider)
-        .then((result) => {
-            showToast("Đăng nhập Facebook thành công!", "success");
+// Đăng nhập ẩn danh (Khách)
+function loginAnonymously() {
+    const btn = event.currentTarget;
+    const originalHTML = btn.innerHTML;
+    
+    // Hiệu ứng Loading
+    btn.innerHTML = '<i class="fa-solid fa-circle-notch animate-spin"></i> ĐANG KHỞI TẠO...';
+    btn.disabled = true;
+
+    auth.signInAnonymously()
+        .then(() => {
+            showToast("Đã đăng nhập quyền Khách!", "success");
         })
         .catch((error) => {
             showToast("Lỗi: " + error.message, "error");
+            btn.innerHTML = originalHTML;
+            btn.disabled = false;
         });
 }
 
