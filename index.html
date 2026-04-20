@@ -387,23 +387,17 @@ table th:first-child, table td:first-child {
 </div>
 
         <!-- USER VIEW -->
-        <div id="view-user" class="w-full max-w-xl px-2 lg:px-0 page-enter hidden pb-6 lg:pb-0 mx-auto">
-            <div id="u-step-1" class="space-y-10 text-center pt-10">
-                <h1 class="text-4xl lg:text-7xl font-black uppercase italic bg-gradient-to-b from-white to-white/40 bg-clip-text text-transparent">Check-in</h1>
-                <div class="glass p-6 lg:p-10 rounded-3xl space-y-8">
-                    <input type="text" id="u-code-input" placeholder="MÃ PHÒNG" class="w-full p-8 text-4xl font-black tracking-[10px] rounded-3xl uppercase text-center">
-                    <button onclick="checkCode()" class="btn-glow w-full py-6 rounded-3xl uppercase font-black text-lg">Bắt đầu</button>
-                </div>
-            </div>
-            <div id="u-step-2" class="glass p-6 lg:p-10 rounded-3xl space-y-8 hidden">
-                <div class="flex justify-between items-center border-b border-white/5 pb-4">
-                    <span id="u-title" class="text-lg font-black text-indigo-400 uppercase italic"></span>
-                    <button onclick="location.reload()" class="w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-slate-500">✕</button>
-                </div>
-                <div id="u-form" class="space-y-4"></div>
-                <button onclick="submitAttendance()" class="btn-glow w-full py-4 rounded-2xl uppercase font-black text-xl">Xác nhận</button>
-            </div>
+<div id="view-user" class="w-full max-w-xl px-2 lg:px-0 page-enter hidden pb-6 lg:pb-0 mx-auto">
+    <!-- ĐÃ XÓA u-step-1 TẠI ĐÂY -->
+    <div id="u-step-2" class="glass p-6 lg:p-10 rounded-3xl space-y-8">
+        <div class="flex justify-between items-center border-b border-white/5 pb-4">
+            <span id="u-title" class="text-lg font-black text-emerald-400 uppercase italic"></span>
+            <button onclick="location.reload()" class="w-8 h-8 flex items-center justify-center bg-white/5 rounded-full text-slate-500 hover:text-white transition-colors">✕</button>
         </div>
+        <div id="u-form" class="space-y-4"></div>
+        <button onclick="submitAttendance()" class="btn-glow w-full py-4 rounded-2xl uppercase font-black text-xl">Xác nhận</button>
+    </div>
+</div>
 
 <!-- ADMIN VIEW -->
 <div id="view-admin" class="max-w-[1600px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 page-enter hidden items-start">
@@ -412,9 +406,9 @@ table th:first-child, table td:first-child {
         <div class="glass p-6 lg:p-8 rounded-3xl">
             <h3 class="text-xs font-black text-indigo-400 uppercase mb-6 tracking-[2px] italic border-l-2 border-indigo-500 pl-3">Tạo sự kiện</h3>
             <div class="space-y-4">
-                <input type="text" id="a-code" placeholder="MÃ PHÒNG" class="w-full p-3 rounded-xl font-black uppercase text-center">
-                <input type="text" id="a-title" placeholder="TÊN SỰ KIỆN" class="w-full p-3 rounded-xl font-bold">
-                <input type="number" id="a-duration" placeholder="THỜI GIAN (PHÚT)" class="w-full p-3 rounded-xl font-bold">
+                <label class="text-[10px] font-bold text-emerald-400 uppercase">Tên sự kiện của bạn</label>
+                <input type="text" id="a-title" placeholder="VÍ DỤ: HỌP LỚP 12A1" class="w-full p-4 rounded-xl font-bold bg-white/5 border border-white/10">
+                <input type="number" id="a-duration" placeholder="THỜI GIAN (PHÚT)" class="w-full p-4 rounded-xl font-bold bg-white/5 border border-white/10">
                 <div id="admin-fields-list" class="space-y-2 bg-white/5 p-4 rounded-2xl max-h-[30vh] overflow-y-auto"></div>
                 <button onclick="addField()" class="w-full py-2 border border-white/10 rounded-xl text-[10px] font-black text-slate-400">+ Thêm</button>
                 <button onclick="activateSession()" class="btn-glow w-full py-4 rounded-2xl text-white font-black uppercase text-xs">Kích hoạt</button>
@@ -564,15 +558,32 @@ let userSession = null;
 let lastQRUrl = "";
 let confirmCallback = null;
 
+function createSlug(str) {
+    str = str.toLowerCase().trim();
+    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+    str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+    str = str.replace(/đ/g, "d");
+    str = str.replace(/\s+/g, "-"); // Thay khoảng trắng bằng gạch ngang
+    str = str.replace(/[^a-z0-9-]/g, ""); // Xóa ký tự đặc biệt
+    return str + "-" + Math.floor(1000 + Math.random() * 9000); // Thêm 4 số ngẫu nhiên để tránh trùng
+}
+
 // 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
 async function activateSession() {
-    const code = document.getElementById('a-code').value.trim().toUpperCase();
     const title = document.getElementById('a-title').value.trim();
     const duration = parseInt(document.getElementById('a-duration').value);
     const fields = Array.from(document.querySelectorAll('.field-input')).map(i => i.value.trim()).filter(v => v);
     
-    if(!code || !title || !duration) return showToast("Điền đủ thông tin!", "info");
-    showToast("Đang tạo Google Sheets...", "info");
+    if(!title || !duration) return showToast("Vui lòng nhập tên sự kiện và thời gian!", "info");
+    
+    // TỰ TẠO MÃ TỪ TÊN SỰ KIỆN
+    const code = createSlug(title); 
+    
+    showToast("Đang khởi tạo hệ thống...", "info");
 
     try {
         const query = new URLSearchParams({ action: "create", title: title, fields: JSON.stringify(fields) });
@@ -584,17 +595,22 @@ async function activateSession() {
         const expiryTime = Date.now() + (duration * 60 * 1000);
         const sessionData = { code, title, fields, sheetUrl, expiryTime, ts: Date.now() };
 
+        // Lưu vào Firebase với mã tự tạo
         await rdb.ref('dynamic_attendance/sessions/' + code).set(sessionData);
         currentSession = sessionData;
         
-        showToast("Đã tạo Sheet & Kích hoạt!", "success");
-        let roomUrl = window.location.href.split('?')[0] + "?room=" + code;
+        showToast("Đã kích hoạt thành công!", "success");
+
+        // Tạo link QR
+        let roomUrl = window.location.origin + window.location.pathname + "?room=" + code;
         lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
+        
         document.getElementById('qr-container').classList.remove('hidden');
-        document.getElementById('qr-code').innerHTML = `<img src="${lastQRUrl}" class="w-48 h-48 mx-auto rounded-2xl">`;
+        document.getElementById('qr-code').innerHTML = `<img src="${lastQRUrl}" class="w-48 h-48 mx-auto rounded-2xl border-4 border-white">`;
+        
         listenLogs(code);
     } catch (e) {
-        showToast("Lỗi: Kiểm tra lại Deploy 'Anyone'", "error");
+        showToast("Lỗi kết nối Google Sheet!", "error");
     }
 }
 
@@ -647,16 +663,27 @@ function checkAuthState() {
     });
 }
 
-function checkCode(forced = null) {
-    const code = forced || document.getElementById('u-code-input').value.trim().toUpperCase();
-    if(!code) return;
-    rdb.ref('dynamic_attendance/sessions/' + code).once('value', snap => {
-        if(!snap.exists()) return showToast("Mã phòng sai!", "error");
+function checkCode(forced) {
+    if(!forced) return; // Nếu không có mã từ URL thì không làm gì cả
+    
+    rdb.ref('dynamic_attendance/sessions/' + forced).once('value', snap => {
+        if(!snap.exists()) {
+            showToast("Phòng không tồn tại hoặc đã bị xóa!", "error");
+            setTimeout(() => { showView('auth'); }, 2000);
+            return;
+        }
+        
         userSession = snap.val();
-        if (Date.now() > userSession.expiryTime) return showToast("Hết thời gian!", "error");
-        showView('user'); // Hiện view user
-        document.getElementById('u-step-1').classList.add('hidden'); // Ẩn ô nhập mã
-        document.getElementById('u-step-2').classList.remove('hidden'); // Hiện form điền tên
+        
+        // Kiểm tra hết hạn
+        if (Date.now() > userSession.expiryTime) {
+            showToast("Phiên điểm danh này đã kết thúc!", "error");
+            return;
+        }
+        
+        showView('user');
+        // Hiển thị trực tiếp Step 2
+        document.getElementById('u-step-2').classList.remove('hidden');
         document.getElementById('u-title').innerText = userSession.title;
         document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
             <div class="space-y-1">
@@ -892,18 +919,17 @@ document.addEventListener('keydown', (e) => {
 window.onload = () => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
+    
     if (room) {
-        // Đợi 500ms để đảm bảo giao diện ổn định rồi mới hiện form
+        // Nếu có mã phòng trên URL (Quét QR), vào thẳng form
         setTimeout(() => {
             checkCode(room.toUpperCase());
-        }, 500);
+        }, 300);
     } else {
+        // Nếu không có mã, đưa về trang đăng nhập Admin
         checkAuthState();
     }
 };
-
-function deleteLog(id) { showConfirm("Xóa dòng này?", () => rdb.ref('dynamic_attendance/logs/' + currentSession.code + '/' + id).remove()); }
-function clearLogs() { showConfirm("Xóa sạch dữ liệu?", () => rdb.ref('dynamic_attendance/logs/' + currentSession.code).remove()); }
 
 async function handleAuth() {
     const input = document.getElementById('auth-identifier').value.trim();
