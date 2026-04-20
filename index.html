@@ -14,6 +14,27 @@
 
     <style>
 
+/* Hiệu ứng rung lắc dữ dội */
+@keyframes shake-urgent {
+    0%, 100% { transform: translateX(0) scale(1); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-8px) scale(1.02); }
+    20%, 40%, 60%, 80% { transform: translateX(8px) scale(1.02); }
+}
+
+.modal-urgent {
+    animation: shake-urgent 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    box-shadow: 0 0 150px rgba(239, 68, 68, 0.7) !important;
+    border: 3px solid #ef4444 !important;
+    background: rgba(15, 23, 42, 0.95) !important;
+}
+
+/* Nền tối sầm và đỏ lịm */
+.backdrop-panic {
+    background: radial-gradient(circle, rgba(153, 27, 27, 0.6) 0%, rgba(3, 7, 18, 0.98) 100%) !important;
+    backdrop-filter: blur(25px) grayscale(1) !important;
+    display: flex !important;
+}
+
 /* Hiệu ứng click chung cho tất cả các nút */
 button {
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
@@ -437,7 +458,13 @@ table th:first-child, table td:first-child {
     <!-- CỘT TRÁI: TẠO SỰ KIỆN -->
     <div class="lg:col-span-4 space-y-6">
         <div class="glass p-6 lg:p-8 rounded-3xl">
-            <h3 class="text-xs font-black text-indigo-400 uppercase mb-6 tracking-[2px] italic border-l-2 border-indigo-500 pl-3">Tạo sự kiện</h3>
+            <div class="flex justify-between items-center mb-6 border-l-2 border-indigo-500 pl-3">
+                <h3 class="text-xs font-black text-indigo-400 uppercase tracking-[2px] italic">Tạo sự kiện</h3>
+                <!-- NÚT XEM LỊCH SỬ MỚI -->
+                <button onclick="showHistory()" class="text-[10px] font-black text-slate-400 hover:text-white flex items-center gap-1 transition-colors">
+                    <i class="fa-solid fa-clock-rotate-left"></i> LỊCH SỬ
+                </button>
+            </div>
             <div class="space-y-4">
                 <label class="text-[10px] font-bold text-emerald-400 uppercase">Tên sự kiện của bạn</label>
                 <input type="text" id="a-title" placeholder="VÍ DỤ: HỌP LỚP 12A1" class="w-full p-4 rounded-xl font-bold bg-white/5 border border-white/10">
@@ -545,14 +572,20 @@ table th:first-child, table td:first-child {
 </div>
 
 <div id="toast-container"></div>
-<div id="confirm-modal" class="fixed inset-0 z-[10003] hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-    <div class="glass p-8 rounded-[32px] max-w-sm w-full text-center border border-white/10">
-        <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4 text-red-500 text-2xl">⚠️</div>
-        <h3 class="text-xl font-black uppercase italic mb-2">Xác nhận</h3>
-        <p id="confirm-msg" class="text-slate-400 text-sm mb-8"></p>
-        <div class="flex gap-3">
-            <button onclick="closeConfirm(false)" class="flex-1 py-3 rounded-xl font-bold bg-white/5 hover:bg-white/10 uppercase text-[10px]">Hủy</button>
-            <button id="confirm-btn-yes" class="flex-1 py-3 rounded-xl font-bold bg-red-500 text-white hover:bg-red-600 uppercase text-[10px]">Đồng ý</button>
+<div id="confirm-modal" class="fixed inset-0 z-[11000] hidden items-center justify-center p-4">
+    <div class="glass p-10 rounded-[40px] max-w-lg w-full text-center relative overflow-hidden">
+        <div class="relative z-10">
+            <div class="w-24 h-24 bg-red-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-2xl animate-bounce">
+                <i class="fa-solid fa-triangle-exclamation text-white text-4xl"></i>
+            </div>
+            <h3 class="text-3xl font-black uppercase italic mb-4 text-red-500">XÁC NHẬN TỰ HỦY</h3>
+            <div class="bg-red-500/10 border border-red-500/20 p-6 rounded-2xl mb-8">
+                <p id="confirm-msg" class="text-white text-base font-bold leading-relaxed uppercase tracking-tighter"></p>
+            </div>
+            <div class="flex gap-4">
+                <button onclick="closeConfirm(false)" class="flex-1 py-5 rounded-2xl font-black bg-white/5 text-slate-400 uppercase text-xs">HỦY THAO TÁC</button>
+                <button id="confirm-btn-yes" class="flex-1 py-5 rounded-2xl font-black bg-red-600 text-white uppercase text-xs shadow-lg active:scale-90 transition-all">ĐỒNG Ý XÓA SẠCH</button>
+            </div>
         </div>
     </div>
 </div>
@@ -950,18 +983,98 @@ function showToast(msg, type = 'info') {
 }
 
 function showConfirm(msg, callback) {
-    document.getElementById('confirm-msg').innerText = msg;
     const modal = document.getElementById('confirm-modal');
-    modal.classList.remove('hidden'); modal.classList.add('flex');
+    const msgEl = document.getElementById('confirm-msg');
+    const content = modal.querySelector('.glass');
+
+    msgEl.innerText = msg;
+    modal.classList.remove('hidden');
+    modal.classList.add('backdrop-panic'); // Kích hoạt nền Panic
+    
+    // Kích hoạt rung lắc
+    content.classList.remove('modal-urgent');
+    void content.offsetWidth; 
+    content.classList.add('modal-urgent');
+
     confirmCallback = callback;
 }
 
-function closeConfirm(res) {
-    document.getElementById('confirm-modal').classList.add('hidden');
-    if(res && confirmCallback) confirmCallback();
-    confirmCallback = null;
+// Hàm thực hiện xóa sạch và dọn dẹp giao diện tức thì
+function clearAllHistory() {
+    showConfirm(
+        "CẢNH BÁO TỐI CAO: HÀNH ĐỘNG NÀY SẼ XÓA VĨNH VIỄN TOÀN BỘ DỮ LIỆU. XÓA NGAY LẬP TỨC?", 
+        async () => {
+            try {
+                showToast("Đang quét sạch hệ thống...", "info");
+                
+                // 1. Xóa trên Server Firebase
+                await rdb.ref('dynamic_attendance').remove();
+
+                // 2. DỌN DẸP GIAO DIỆN NGAY LẬP TỨC (KHÔNG LOAD LẠI TRANG)
+                
+                // Xóa danh sách trong Modal Lịch sử
+                const historyList = document.getElementById('history-list');
+                if (historyList) historyList.innerHTML = '<p class="text-center text-slate-500 py-10">Hệ thống hiện đang trống.</p>';
+
+                // Xóa bảng báo cáo đang hiện trước mặt
+                document.getElementById('table-body').innerHTML = "";
+                document.getElementById('table-head').innerHTML = "";
+                document.getElementById('report-title').innerText = "Báo cáo";
+
+                // Ẩn khu vực mã QR và mã phòng
+                document.getElementById('qr-container').classList.add('hidden');
+                document.getElementById('display-room-code').innerText = "";
+                
+                // Reset các biến dữ liệu tạm trong bộ nhớ
+                currentSession = null;
+                lastQRUrl = "";
+
+                showToast("Hệ thống đã được làm sạch!", "success");
+                
+                // Không dùng location.reload() nữa để giữ nguyên trạng thái web
+
+            } catch (e) {
+                console.error(e);
+                showToast("Lỗi hệ thống, không thể xóa dữ liệu!", "error");
+            }
+        }
+    );
 }
-document.getElementById('confirm-btn-yes').onclick = () => closeConfirm(true);
+
+// Gán sự kiện cho nút "Đồng ý" (Chỉ gán 1 lần duy nhất này)
+document.getElementById('confirm-btn-yes').onclick = async function() {
+    if (confirmCallback) {
+        // Vô hiệu hóa nút tạm thời
+        this.disabled = true;
+        const oldText = this.innerText;
+        this.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> ĐANG XÓA...';
+        
+        // Thực hiện hàm xóa
+        await confirmCallback(); 
+        
+        // Đóng thông báo sau khi hoàn tất
+        closeConfirm(true);
+        
+        // Trả lại trạng thái nút
+        this.disabled = false;
+        this.innerText = oldText;
+    }
+};
+
+function closeConfirm(res) {
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('backdrop-panic');
+    // Nếu bấm Hủy thì xóa callback đi
+    if(!res) confirmCallback = null;
+}
+
+function closeConfirm(res) {
+    const modal = document.getElementById('confirm-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('backdrop-panic');
+    if(!res) confirmCallback = null;
+}
 
 function zoomQR() {
     const overlay = document.getElementById('qr-zoom-overlay');
@@ -1117,6 +1230,114 @@ document.querySelectorAll('button').forEach(btn => {
     });
 });
 
+// Hàm hiển thị danh sách lịch sử từ Firebase
+async function showHistory() {
+    const listContainer = document.getElementById('history-list');
+    listContainer.innerHTML = '<p class="text-center text-slate-500 py-10 animate-pulse text-xs uppercase tracking-widest">Đang tải dữ liệu...</p>';
+    document.getElementById('history-modal').classList.remove('hidden');
+    document.getElementById('history-modal').classList.add('flex');
+
+    try {
+        const snap = await rdb.ref('dynamic_attendance/sessions').once('value');
+        if (!snap.exists()) {
+            listContainer.innerHTML = '<p class="text-center text-slate-500 py-10">Chưa có sự kiện nào được tạo.</p>';
+            return;
+        }
+
+        const data = snap.val();
+        // Chuyển object sang array và sắp xếp theo thời gian mới nhất lên đầu
+        const sessions = Object.values(data).sort((a, b) => b.ts - a.ts);
+        
+        renderHistoryItems(sessions);
+    } catch (e) {
+        showToast("Lỗi khi tải lịch sử!", "error");
+    }
+}
+
+function renderHistoryItems(items) {
+    const listContainer = document.getElementById('history-list');
+    listContainer.innerHTML = items.map(item => `
+        <div class="history-item glass p-4 rounded-2xl border border-white/5 hover:border-indigo-500/30 transition-all group">
+            <div class="flex justify-between items-start">
+                <div class="space-y-1">
+                    <h4 class="font-black text-sm text-white uppercase group-hover:text-indigo-400 transition-colors">${item.title}</h4>
+
+                    <p class="text-[9px] text-slate-600">${new Date(item.ts).toLocaleString('vi-VN')}</p>
+                </div>
+                <div class="flex gap-2">
+                    <!-- Nút mở Sheet -->
+                    <a href="${item.sheetUrl}" target="_blank" class="p-2 bg-emerald-500/10 text-emerald-500 rounded-lg hover:bg-emerald-500 hover:text-white transition-all shadow-sm" title="Mở Google Sheet">
+                        <i class="fa-solid fa-table"></i>
+                    </a>
+                    <!-- Nút khôi phục để xem báo cáo ngay trên Web -->
+                    <button onclick="restoreSession('${item.code}')" class="p-2 bg-indigo-500/10 text-indigo-500 rounded-lg hover:bg-indigo-500 hover:text-white transition-all shadow-sm" title="Xem báo cáo trên web">
+                        <i class="fa-solid fa-chart-column"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Hàm lọc tìm kiếm trong lịch sử
+function filterHistory() {
+    const query = document.getElementById('history-search').value.toLowerCase();
+    const items = document.querySelectorAll('.history-item');
+    items.forEach(item => {
+        const title = item.querySelector('h4').innerText.toLowerCase();
+        item.style.display = title.includes(query) ? 'block' : 'none';
+    });
+}
+
+// Hàm đóng lịch sử
+function closeHistory() {
+    document.getElementById('history-modal').classList.add('hidden');
+}
+
+// Hàm khôi phục lại phiên làm việc cũ để xem báo cáo trực tiếp
+async function restoreSession(code) {
+    showToast("Đang khôi phục phiên...", "info");
+    const snap = await rdb.ref('dynamic_attendance/sessions/' + code).once('value');
+    if (snap.exists()) {
+        currentSession = snap.val();
+        document.getElementById('report-title').innerText = currentSession.title;
+        
+        // Hiển thị mã QR cũ
+        let roomUrl = window.location.origin + window.location.pathname + "?room=" + code;
+        lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
+        document.getElementById('qr-container').classList.remove('hidden');
+        document.getElementById('qr-code').innerHTML = `<img src="${lastQRUrl}" class="w-48 h-48 mx-auto rounded-2xl border-4 border-white">`;
+        
+        // Lắng nghe dữ liệu mới
+        listenLogs(code);
+        closeHistory();
+        showToast("Đã khôi phục!", "success");
+    }
+}
+
 </script>
+<!-- MODAL LỊCH SỬ SỰ KIỆN -->
+<div id="history-modal" class="fixed inset-0 z-[10004] hidden items-center justify-center bg-black/90 backdrop-blur-md p-4">
+    <div class="glass p-6 lg:p-8 rounded-[32px] max-w-2xl w-full max-h-[80vh] flex flex-col border border-white/10">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-black uppercase italic text-indigo-400">Tất cả sự kiện</h3>
+            <div class="flex gap-2">
+                <!-- NÚT XÓA TẤT CẢ -->
+                <button onclick="clearAllHistory()" class="text-[9px] font-black text-red-500 border border-red-500/40 px-3 py-2 rounded-xl hover:bg-red-600 hover:text-white transition-all uppercase">
+                    <i class="fa-solid fa-dumpster-fire mr-1"></i> Xóa hết dữ liệu
+                </button>
+                <button onclick="closeHistory()" class="w-8 h-8 flex items-center justify-center bg-white/5 rounded-full hover:text-red-500 transition-colors">✕</button>
+            </div>
+        </div>
+        <input type="text" id="history-search" oninput="filterHistory()" placeholder="Tìm tên sự kiện..." class="w-full p-3 mb-4 rounded-xl text-xs bg-white/5 border border-white/10">
+        <div id="history-list" class="flex-1 overflow-y-auto space-y-3 custom-scrollbar"></div>
+    </div>
+</div>
+
+<style>
+/* Thanh cuộn cho danh sách lịch sử */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(99, 102, 241, 0.3); border-radius: 10px; }
+</style>
 </body>
 </html>
