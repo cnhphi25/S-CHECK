@@ -559,11 +559,6 @@ table th:first-child, table td:first-child {
         </div>
     </div>
 
-    <!-- Thông tin Room Code bên dưới QR -->
-    <div class="mt-6 space-y-1">
-        <p id="display-room-code" class="text-2xl font-black text-white tracking-[5px] italic"></p>
-    </div>
-
     <!-- Nút Tải về Pro -->
     <button onclick="downloadQR()" class="mt-8 w-full group/btn relative overflow-hidden py-4 bg-white/5 border border-white/10 rounded-2xl flex items-center justify-center gap-3 transition-all hover:bg-white/10 hover:border-indigo-500/50">
         <div class="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover/btn:opacity-100 transition-opacity"></div>
@@ -903,81 +898,64 @@ function listenLogs(code) {
         const body = document.getElementById('table-body');
         const head = document.getElementById('table-head');
         
-if(!snap.exists()) { 
-    body.innerHTML = `
-        <tr>
-            <td colspan="20" class="py-20 text-center border-none bg-transparent"> 
-                <div class="flex flex-col items-center justify-center min-h-[300px]">
-                    <div class="radar-container mb-10">
-                    <div class="radar-circle"></div>
-                    <div class="radar-circle" style="inset: 20%"></div>
-                    <div class="radar-circle" style="inset: 40%"></div>
-                    <div class="radar-circle" style="inset: 60%"></div>
-                    <div class="radar-pulse"></div>
-                    <div class="radar-pulse" style="animation-delay: 1s"></div>
-                    <div class="radar-beam"></div>
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <div class="w-3 h-3 bg-indigo-500 rounded-full shadow-[0_0_25px_rgba(99,102,241,1)]"></div>
-                    </div>
-                </div>
-                <p class="text-[12px] font-black uppercase tracking-[10px] text-indigo-400/40 animate-pulse mt-20">
-                    Hệ thống đang sẵn sàng quét tín hiệu...
-                </p>
-            </td>
-        </tr>`; 
-    return; 
-}
+        // GIỮ NGUYÊN LOGIC RADAR CỦA BẠN
+        if(!snap.exists()) { 
+            body.innerHTML = `
+                <tr>
+                    <td colspan="20" class="py-20 text-center border-none bg-transparent"> 
+                        <div class="flex flex-col items-center justify-center min-h-[300px]">
+                            <div class="radar-container mb-10">
+                            <div class="radar-circle"></div>
+                            <div class="radar-circle" style="inset: 20%"></div>
+                            <div class="radar-circle" style="inset: 40%"></div>
+                            <div class="radar-circle" style="inset: 60%"></div>
+                            <div class="radar-pulse"></div>
+                            <div class="radar-pulse" style="animation-delay: 1s"></div>
+                            <div class="radar-beam"></div>
+                            <div class="absolute inset-0 flex items-center justify-center">
+                                <div class="w-3 h-3 bg-indigo-500 rounded-full shadow-[0_0_25px_rgba(99,102,241,1)]"></div>
+                            </div>
+                        </div>
+                        <p class="text-[12px] font-black uppercase tracking-[10px] text-indigo-400/40 animate-pulse mt-20">
+                            Hệ thống đang sẵn sàng quét tín hiệu...
+                        </p>
+                    </td>
+                </tr>`; 
+            return; 
+        }
 
-        // 1. Header
+        // --- SỬA PHẦN TIÊU ĐỀ (HEADER) CHO ĐÚNG ---
         let headHTML = `<tr>
             <th class="col-delete"></th> 
-            <th class="col-stt text-slate-500 text-[10px] uppercase font-black tracking-widest">STT</th>
-            <th class="col-time text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">Dấu thời gian</th>`;
+            <th class="col-stt text-slate-500 text-[10px] uppercase font-black tracking-widest text-center">STT</th>
+            <th class="col-time text-slate-500 text-[10px] uppercase font-black tracking-widest text-center">Thời gian</th>`;
         
+        // Hiện đúng tên cột dựa theo dữ liệu bạn nhập khi tạo sự kiện
         currentSession.fields.forEach(f => {
-            headHTML += `<th class="text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">Chi tiết</th></tr>`;
+            headHTML += `<th class="text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">${f}</th>`;
         });
-        headHTML += `</tr>`;
+        
+        // Cột cuối cùng cho Icon thiết bị
+        headHTML += `<th class="text-center text-slate-500 text-[10px] uppercase font-black tracking-widest">Thiết bị</th></tr>`;
         head.innerHTML = headHTML;
 
-        // 2. Body
+        // --- SỬA PHẦN DỮ LIỆU (BODY) ---
         const data = Object.entries(snap.val()); 
         body.innerHTML = data.map(([id, l], index) => {
-            // Ô Xóa
-            let deleteCell = `
-                <td class="glass-left text-center">
-                    <button onclick="deleteLog('${id}')" 
-                            class="w-8 h-8 inline-flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg">
-                        ✕
-                    </button>
-                </td>`;
-
-            // Ô STT
+            let deleteCell = `<td class="glass-left text-center"><button onclick="deleteLog('${id}')" class="w-8 h-8 inline-flex items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all shadow-lg">✕</button></td>`;
             let sttCell = `<td class="glass-mid text-slate-400 font-extrabold text-sm text-center">${index + 1}</td>`;
-
-            // Ô Thời gian
             let timeCell = `<td class="glass-mid text-center text-[11px] font-mono text-indigo-400 italic">${l.time}</td>`;
-
-            let infoBtn = `
-            <td class="glass-right text-center">
-                <button onclick="viewDeviceInfo('${id}')" class="text-indigo-400 hover:text-white transition-colors">
-                    <i class="fa-solid fa-circle-info"></i>
-                </button>
-            </td>`;
             
-            // Các ô động (Tự dãn theo độ dài chữ)
             let valueCells = "";
             currentSession.fields.forEach((field, fIndex) => {
                 let cellValue = l.values[fIndex] !== undefined ? l.values[fIndex] : "";
-                let isLast = fIndex === currentSession.fields.length - 1;
-                let cellClass = isLast ? "glass-right" : "glass-mid";
-                
-                valueCells += `<td class="${cellClass} text-sm font-bold text-white/90 uppercase">
-                                    ${cellValue}
-                               </td>`;
+                valueCells += `<td class="glass-mid text-sm font-bold text-white/90 uppercase text-center">${cellValue}</td>`;
             });
 
-            return `<tr class="transition-all duration-300">${deleteCell}${sttCell}${timeCell}${valueCells}</tr>`;
+            // Ô cuối cùng dùng class glass-right để bo góc phải của hàng
+            let infoBtn = `<td class="glass-right text-center"><button onclick="viewDeviceInfo('${id}')" class="text-indigo-400 hover:text-indigo-300 transition-all scale-125"><i class="fa-solid fa-circle-info"></i></button></td>`;
+
+            return `<tr class="transition-all duration-300">${deleteCell}${sttCell}${timeCell}${valueCells}${infoBtn}</tr>`;
         }).join('');
     });
 }
