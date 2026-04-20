@@ -171,9 +171,9 @@ tr.glass td:first-child {
 .table-container {
     width: 100%;
     overflow-x: auto;
-    overflow-y: visible; /* Quan trọng: Để sóng radar lan ra ngoài không bị mất */
+    overflow-y: visible;
     margin-left: -10px;
-    padding: 20px 0; /* Thêm padding đệm */
+    padding: 0; /* Không đệm trên dưới nữa */
 }
 
 /* Xóa bỏ nền mặc định của tr khi ở trạng thái radar để nó không tạo thành một cái dải đen hẹp */
@@ -552,8 +552,8 @@ table th:first-child, table td:first-child {
 </div>
 
     <!-- CỘT PHẢI: BÁO CÁO -->
-    <div class="lg:col-span-8 glass p-6 lg:p-10 rounded-3xl min-h-[600px] flex flex-col"> 
-        <div class="flex justify-between items-center mb-6 lg:mb-10">
+    <div class="lg:col-span-8 glass p-6 lg:p-10 rounded-3xl flex flex-col"> <!-- Đã xóa min-h-[600px] -->
+        <div class="flex justify-between items-center mb-2"> <!-- Đã đổi mb-10 thành mb-2 -->
             <h2 id="report-title" class="text-2xl font-black italic uppercase">Báo cáo</h2>
             <div class="flex gap-2">
                 <button onclick="showSheetSync()" class="text-[10px] font-black text-emerald-400 uppercase border border-emerald-400/20 px-3 py-2 rounded-xl hover:bg-emerald-400/10 flex items-center gap-2">
@@ -562,7 +562,7 @@ table th:first-child, table td:first-child {
                 <button onclick="clearLogs()" class="text-[10px] font-black text-red-500 uppercase border border-red-500/20 px-3 py-2 rounded-xl hover:bg-red-500/10">🗑 Xóa</button>
             </div>
         </div>
-        <div class="table-container flex-1">
+        <div class="table-container"> <!-- Đã xóa flex-1 và items-center justify-center -->
             <table class="w-full text-left border-separate border-spacing-y-2">
                 <thead id="table-head" class="text-slate-500 text-[10px] uppercase font-black tracking-widest"></thead>
                 <tbody id="table-body"></tbody>
