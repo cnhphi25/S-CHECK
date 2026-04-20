@@ -259,6 +259,30 @@ table th:first-child, table td:first-child {
 </head>
 <body>
 
+    <!-- LOADING SCREEN -->
+<div id="initial-loader" class="fixed inset-0 z-[11000] flex flex-col items-center justify-center bg-[#030712]">
+    <div class="mesh-bg"></div> <!-- Giữ nền gradient phía sau -->
+    <div class="relative flex flex-col items-center">
+        <!-- Radar Animation -->
+        <div class="radar-container scale-75 mb-8">
+            <div class="radar-circle"></div>
+            <div class="radar-circle" style="inset: 20%"></div>
+            <div class="radar-circle" style="inset: 40%"></div>
+            <div class="radar-pulse"></div>
+            <div class="radar-beam"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+                <div class="w-2 h-2 bg-indigo-500 rounded-full shadow-[0_0_20px_rgba(99,102,241,1)]"></div>
+            </div>
+        </div>
+        
+        <!-- Text Loading -->
+        <div class="text-center space-y-2">
+            <h2 class="text-indigo-400 text-[10px] font-black uppercase tracking-[5px] animate-pulse">S-CHECK PRO SYSTEM</h2>
+            <p id="loader-text" class="text-white/40 text-[8px] font-bold uppercase tracking-[2px]">Đang quét tín hiệu hệ thống...</p>
+        </div>
+    </div>
+</div>
+
 <div class="mesh-bg"></div>
 
 <!-- QR OVERLAY -->
@@ -307,7 +331,7 @@ table th:first-child, table td:first-child {
         <!-- Thêm font và icon từ CDN -->
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
-<div id="view-auth" class="w-full max-w-md px-4 lg:px-0 mx-auto page-enter">
+<div id="view-auth" class="w-full max-w-md px-4 lg:px-0 mx-auto page-enter hidden">
     <div class="text-center mb-8">
         <!-- Logo với hiệu ứng đổ bóng và bo góc -->
         <div class="relative inline-block">
@@ -647,52 +671,60 @@ function showSheetSync() {
 function checkAuthState() {
     auth.onAuthStateChanged(user => {
         const nav = document.getElementById('nav-auth');
+        const params = new URLSearchParams(window.location.search);
+        
+        // Nếu đang trong chế độ quét QR thì không làm gì cả, để checkCode xử lý
+        if (params.get('room')) return; 
+
         if (user) {
             showView('admin');
-            // Xử lý để lấy ID gốc: Nếu chứa @scheck.pro thì xóa đi, nếu là gmail thật thì giữ nguyên
             const displayName = user.email.replace('@scheck.pro', '');
-            
             nav.innerHTML = `<button onclick="auth.signOut()" class="text-[10px] font-black text-red-500 uppercase bg-white/5 px-4 py-2 rounded-xl">Thoát (${displayName})</button>`;
-            
             document.getElementById('admin-fields-list').innerHTML = "";
             addField("Họ và Tên"); addField("Lớp / Phòng ban");
         } else {
             showView('auth');
-            nav.innerHTML = ``; // Đã xóa nút Điểm danh
         }
+        
+        // Xong xuôi thì ẩn loader
+        hideInitialLoader();
     });
 }
 
 function checkCode(forced) {
     if(!forced) return; 
     
-    // Sửa lại dòng này để vừa chuyển chữ thường, vừa xóa dấu (giống createSlug)
+    // Hiển thị màn hình user ngay (trạng thái chờ)
+    showView('user');
+    
+    // Xử lý chuẩn hóa mã phòng
     let roomCode = forced.toLowerCase().trim();
-    roomCode = roomCode.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
-    roomCode = roomCode.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
-    roomCode = roomCode.replace(/ì|í|ị|ỉ|ĩ/g, "i");
-    roomCode = roomCode.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
-    roomCode = roomCode.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
-    roomCode = roomCode.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
-    roomCode = roomCode.replace(/đ/g, "d");
-    roomCode = roomCode.replace(/\s+/g, "-");
+    roomCode = roomCode.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a")
+                       .replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e")
+                       .replace(/ì|í|ị|ỉ|ĩ/g, "i")
+                       .replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o")
+                       .replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u")
+                       .replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y")
+                       .replace(/đ/g, "d")
+                       .replace(/\s+/g, "-");
     
     rdb.ref('dynamic_attendance/sessions/' + roomCode).once('value', snap => {
         if(!snap.exists()) {
-            showToast("Phòng không tồn tại hoặc đã bị xóa!", "error");
-            setTimeout(() => { showView('auth'); }, 2000);
+            showToast("Phòng không tồn tại!", "error");
+            hideInitialLoader(); // Vẫn phải ẩn loader để thấy thông báo lỗi
+            setTimeout(() => { window.location.href = window.location.pathname; }, 2000);
             return;
         }
         
         userSession = snap.val();
         
-        // Kiểm tra hết hạn
         if (Date.now() > userSession.expiryTime) {
-            showToast("Phiên điểm danh này đã kết thúc!", "error");
+            showToast("Phiên đã kết thúc!", "error");
+            hideInitialLoader();
             return;
         }
         
-        showView('user');
+        // Render form thông tin
         document.getElementById('u-step-2').classList.remove('hidden');
         document.getElementById('u-title').innerText = userSession.title;
         document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
@@ -700,8 +732,12 @@ function checkCode(forced) {
                 <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
                 <input type="text" class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5" placeholder="Nhập ${f}...">
             </div>`).join('');
+            
+        // Đã tải xong form, ẩn loader
+        hideInitialLoader();
     });
 }
+
 
 function listenLogs(code) {
     rdb.ref('dynamic_attendance/logs/' + code).on('value', snap => {
@@ -926,16 +962,27 @@ document.addEventListener('keydown', (e) => {
     if (e.key === "Escape") { closeQRZoom(); closeConfirm(false); } 
 });
 
+// Hàm ẩn màn hình chờ
+function hideInitialLoader() {
+    const loader = document.getElementById('initial-loader');
+    if (loader) {
+        loader.style.opacity = '0';
+        loader.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => loader.remove(), 500);
+    }
+}
+
 window.onload = () => {
     const params = new URLSearchParams(window.location.search);
     const room = params.get('room');
     
     if (room) {
-        // Chuyển sang checkCode và để hàm đó tự xử lý chữ thường/hoa
-        setTimeout(() => {
-            checkCode(room); 
-        }, 300);
+        // Nếu quét QR (có room)
+        document.getElementById('loader-text').innerText = "Đang kết nối phòng: " + room.toUpperCase();
+        checkCode(room);
     } else {
+        // Nếu vào trang chủ (Admin)
+        document.getElementById('loader-text').innerText = "Đang xác thực quyền quản trị...";
         checkAuthState();
     }
 };
