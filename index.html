@@ -562,7 +562,7 @@ table th:first-child, table td:first-child {
                 <button onclick="clearLogs()" class="text-[10px] font-black text-red-500 uppercase border border-red-500/20 px-3 py-2 rounded-xl hover:bg-red-500/10">🗑 Xóa</button>
             </div>
         </div>
-        <div class="table-container flex-1 flex items-center justify-center">
+        <div class="table-container flex-1">
             <table class="w-full text-left border-separate border-spacing-y-2">
                 <thead id="table-head" class="text-slate-500 text-[10px] uppercase font-black tracking-widest"></thead>
                 <tbody id="table-body"></tbody>
@@ -834,7 +834,8 @@ if(!snap.exists()) {
     body.innerHTML = `
         <tr>
             <td colspan="20" class="py-20 text-center border-none bg-transparent"> 
-                <div class="radar-container mb-10 lg:mb-20"> <!-- Scale để radar to rõ hơn trong khung rộng -->
+                <div class="flex flex-col items-center justify-center min-h-[300px]">
+                    <div class="radar-container mb-10">
                     <div class="radar-circle"></div>
                     <div class="radar-circle" style="inset: 20%"></div>
                     <div class="radar-circle" style="inset: 40%"></div>
