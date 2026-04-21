@@ -599,27 +599,20 @@ table th:first-child, table td:first-child {
 </div>
 
 <script>
-    // --- BẢO MẬT: CHỐNG F12 VÀ KIỂM TRA PHẦN TỬ ---
+ // --- BẢO MẬT: CHỐNG F12 VÀ KIỂM TRA PHẦN TỬ (ĐÃ FIX CHO MOBILE) ---
 (function() {
     function destroyWeb() {
-        // Xóa sạch nội dung HTML
         document.documentElement.innerHTML = "";
-        // Chuyển hướng sang trang trắng ngay lập tức
         window.location.replace("about:blank");
     }
 
-    // 1. Chặn phím F12 và các tổ hợp phím mở Console
+    // 1. Chặn phím tắt trên Desktop (F12, Ctrl+U, Ctrl+Shift+I...)
     window.addEventListener('keydown', function(e) {
         if (
-            // Phím F12
             e.keyCode === 123 || 
-            // Ctrl + Shift + I (Inspect)
             (e.ctrlKey && e.shiftKey && e.keyCode === 73) || 
-            // Ctrl + Shift + J (Console)
             (e.ctrlKey && e.shiftKey && e.keyCode === 74) || 
-            // Ctrl + Shift + C (Element)
             (e.ctrlKey && e.shiftKey && e.keyCode === 67) || 
-            // Ctrl + U (View Source)
             (e.ctrlKey && e.keyCode === 85)
         ) {
             e.preventDefault();
@@ -628,18 +621,23 @@ table th:first-child, table td:first-child {
         }
     });
 
-    // 2. Chặn chuột phải (để không chọn được 'Kiểm tra')
+    // 2. Chặn chuột phải
     document.addEventListener('contextmenu', function(e) {
         e.preventDefault();
     });
 
-    // 3. (Nâng cao) Tự hủy nếu cố tình mở DevTools bằng menu trình duyệt
-    // Nếu kích thước cửa sổ thay đổi bất thường (do DevTools chiếm chỗ)
+    // 3. Chỉ kiểm tra thay đổi kích thước trên Desktop
+    // Loại bỏ kiểm tra Chiều cao (Height) vì thanh URL Mobile và Bàn phím ảo sẽ gây lỗi
     var threshold = 160;
     window.addEventListener('resize', function() {
-        if (window.outerWidth - window.innerWidth > threshold || 
-            window.outerHeight - window.innerHeight > threshold) {
-            destroyWeb();
+        // Kiểm tra xem có phải Mobile không (dựa trên UserAgent)
+        var isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        
+        if (!isMobile) {
+            // Trên Desktop, chỉ chặn nếu chiều rộng bị thu hẹp bất thường (mở Console bên cạnh)
+            if (window.outerWidth - window.innerWidth > threshold) {
+                destroyWeb();
+            }
         }
     });
 })();
