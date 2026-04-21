@@ -282,7 +282,7 @@ table th:first-child, table td:first-child {
     inset: 0;
     border-radius: 50%;
     background: conic-gradient(from 0deg, transparent 80%, rgba(99, 102, 241, 0.4) 100%);
-    animation: radar-beam 4s linear infinite; /* Đổi từ 3s thành 4s, Radar nhìn "mượt" và chậm rãi hơn tương ứng với thời gian chờ lâu */
+    animation: radar-beam 2s linear infinite; /* Radar nhìn "mượt" và chậm rãi hơn tương ứng với thời gian chờ lâu */
 }
 
     </style>
@@ -655,7 +655,7 @@ const firebaseConfig = {
 };
 
 // LINK GOOGLE SCRIPT MỚI CỦA BẠN
-const MASTER_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvjeP0EV_xTsbrmftVyq2DcuJyZT34WHt4PT4H9Y-XSFP1NKd-fxw2YGe-o0PNXRppvg/exec";
+const MASTER_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzGW0LjilL5d6HoKb20O-weB5f-FysHsJgwyMZX2FVQEKPjMho1D68WIoj6Kt7FMhbuFw/exec";
 
 firebase.initializeApp(firebaseConfig);
 const rdb = firebase.database();
@@ -810,7 +810,7 @@ function checkCode(forced) {
                        .replace(/đ/g, "d")
                        .replace(/\s+/g, "-");
     
-    // 2. Bắt đầu quá trình quét lâu hơn
+    // 2. Bắt đầu quá trình quét
     rdb.ref('dynamic_attendance/sessions/' + roomCode).once('value', snap => {
         if(!snap.exists()) {
             showToast("Phòng không tồn tại!", "error");
@@ -821,19 +821,19 @@ function checkCode(forced) {
         
         userSession = snap.val();
 
-        // GIAI ĐOẠN 1: Đã thấy tín hiệu (Sau 1.5 giây)
+        // GIAI ĐOẠN 1: Tìm thấy tín hiệu cực nhanh (Sau 0.5 giây)
         setTimeout(() => {
-            loaderText.innerHTML = `<span class="text-emerald-400">ĐÃ PHÁT HIỆN TÍN HIỆU...</span>`;
-        }, 1500);
+            loaderText.innerHTML = `<span class="text-emerald-400 font-bold">ĐÃ KẾT NỐI TÍN HIỆU...</span>`;
+        }, 500);
 
-        // GIAI ĐOẠN 2: Hiển thị tên sự kiện (Sau 3 giây)
+        // GIAI ĐOẠN 2: Hiển thị tên sự kiện (Sau 1.2 giây)
         setTimeout(() => {
             loaderText.innerHTML = `
-                <span class="text-white/40 text-[7px] tracking-[3px]">ĐANG KẾT NỐI VÀO</span><br>
+                <span class="text-white/40 text-[7px] tracking-[3px]">TRUY CẬP VÀO</span><br>
                 <span class="text-indigo-400 text-[11px] font-black italic">${userSession.title.toUpperCase()}</span>`;
-        }, 3000);
+        }, 1200);
 
-        // GIAI ĐOẠN 3: Hoàn tất và hiện Form (Sau 5 giây)
+        // GIAI ĐOẠN 3: Hoàn tất và hiện Form (Tổng cộng 2 giây)
         setTimeout(() => {
             // Render Form dữ liệu
             document.getElementById('u-step-2').classList.remove('hidden');
@@ -846,7 +846,7 @@ function checkCode(forced) {
             
             // Tắt Radar
             hideInitialLoader();
-        }, 5000); // 5000ms = 5 giây quay radar
+        }, 2000); 
     });
 }
 
