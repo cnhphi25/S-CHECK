@@ -17,6 +17,23 @@
 
     <style>
 
+/* Chống trình duyệt đổ màu nền khi tự động điền mật khẩu/tài khoản */
+input:-webkit-autofill,
+input:-webkit-autofill:hover, 
+input:-webkit-autofill:focus, 
+input:-webkit-autofill:active {
+    -webkit-text-fill-color: white !important;
+    /* Dùng box-shadow để đè màu nền mặc định của trình duyệt sang màu Glass tối */
+    -webkit-box-shadow: 0 0 0px 1000px rgba(15, 23, 42, 0.95) inset !important;
+    transition: background-color 5000s ease-in-out 0s;
+    border: 1px solid rgba(59, 130, 246, 0.2) !important; /* Giữ màu viền xanh */
+}
+
+/* Ép màu nền cho tất cả input */
+input {
+    background-color: rgba(59, 130, 246, 0.05) !important;
+}
+
 /* Hiệu ứng rung lắc dữ dội */
 @keyframes shake-urgent {
     0%, 100% { transform: translateX(0) scale(1); }
@@ -395,32 +412,32 @@ table th:first-child, table td:first-child {
         
         <div class="glass relative p-8 lg:p-10 rounded-[2rem] border border-white/10 shadow-2xl backdrop-blur-xl bg-black/40 space-y-5">
             
-            <!-- Input Email/SĐT -->
-            <div class="space-y-1">
-                <label class="text-[10px] text-slate-400 ml-2 uppercase font-bold tracking-widest">Tài khoản</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-500">
-                        <i class="fa-solid fa-user-shield"></i>
-                    </span>
-                    <input type="text" id="auth-identifier" placeholder="Email hoặc SĐT" 
-                           class="w-full pl-11 pr-4 py-4 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-white placeholder:text-slate-600">
-                </div>
-            </div>
+            <!-- Input Tài khoản -->
+<div class="space-y-1">
+    <label class="text-[10px] text-blue-400 ml-2 uppercase font-bold tracking-widest">Tài khoản</label>
+    <div class="relative">
+        <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-blue-400">
+            <i class="fa-solid fa-user-shield"></i>
+        </span>
+        <input type="text" id="auth-identifier" placeholder="Email hoặc SĐT" 
+               class="w-full pl-11 pr-4 py-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white placeholder:text-slate-600">
+    </div>
+</div>
 
-            <!-- Input Mật khẩu -->
-            <div class="space-y-1">
-                <label class="text-[10px] text-slate-400 ml-2 uppercase font-bold tracking-widest">Mật khẩu</label>
-                <div class="relative">
-                    <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-slate-500">
-                        <i class="fa-solid fa-lock"></i>
-                    </span>
-                    <input type="password" id="auth-password" placeholder="••••••••" 
-                           class="w-full pl-11 pr-12 py-4 bg-white/5 border border-white/10 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-white placeholder:text-slate-600">
-                    <button type="button" onclick="togglePassword('auth-password')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white transition-colors">
-                        <i class="fa-solid fa-eye text-sm"></i>
-                    </button>
-                </div>
-            </div>
+<!-- Input Mật khẩu -->
+<div class="space-y-1">
+    <label class="text-[10px] text-blue-400 ml-2 uppercase font-bold tracking-widest">Mật khẩu</label>
+    <div class="relative">
+        <span class="absolute inset-y-0 left-0 pl-4 flex items-center text-blue-400">
+            <i class="fa-solid fa-lock"></i>
+        </span>
+        <input type="password" id="auth-password" placeholder="••••••••" 
+               class="w-full pl-11 pr-12 py-4 bg-blue-500/5 border border-blue-500/20 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all text-white placeholder:text-slate-600">
+        <button type="button" onclick="togglePassword('auth-password')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-white transition-colors">
+            <i class="fa-solid fa-eye text-sm"></i>
+        </button>
+    </div>
+</div>
 
 <!-- XÁC NHẬN MẬT KHẨU (Đã thêm nút con mắt chuẩn) -->
             <div id="confirm-password-container" class="space-y-1 hidden transition-all duration-500 overflow-visible">
@@ -953,7 +970,13 @@ async function handleAuth() {
 function toggleAuthMode() {
     isLoginMode = !isLoginMode;
     
-    const authSubtitle = document.getElementById('auth-subtitle'); // Thẻ nằm trong "mảnh"
+    // --- LỆNH MỚI: XÓA SẠCH DỮ LIỆU TRONG CÁC Ô NHẬP LIỆU ---
+    document.getElementById('auth-identifier').value = "";
+    document.getElementById('auth-password').value = "";
+    document.getElementById('auth-confirm-password').value = "";
+    // -----------------------------------------------------
+
+    const authSubtitle = document.getElementById('auth-subtitle'); 
     const confirmField = document.getElementById('confirm-password-container');
     const btnText = document.getElementById('btn-auth-text');
     const toggleBtn = document.getElementById('btn-toggle-auth');
@@ -961,7 +984,7 @@ function toggleAuthMode() {
     if (!isLoginMode) {
         // Khi chuyển sang Đăng ký
         authSubtitle.innerText = "ĐĂNG KÝ TÀI KHOẢN";
-        authSubtitle.parentElement.classList.replace('bg-indigo-600', 'bg-emerald-600'); // Đổi màu mảnh sang xanh lá nếu muốn
+        authSubtitle.parentElement.classList.replace('bg-indigo-600', 'bg-emerald-600'); 
         
         confirmField.style.display = 'block';
         btnText.innerText = "Đăng ký ngay";
@@ -969,7 +992,7 @@ function toggleAuthMode() {
     } else {
         // Khi quay lại Đăng nhập
         authSubtitle.innerText = "ĐĂNG NHẬP HỆ THỐNG";
-        authSubtitle.parentElement.classList.replace('bg-emerald-600', 'bg-indigo-600'); // Quay về màu xanh tím
+        authSubtitle.parentElement.classList.replace('bg-emerald-600', 'bg-indigo-600'); 
         
         confirmField.style.display = 'none';
         btnText.innerText = "Đăng nhập ngay";
