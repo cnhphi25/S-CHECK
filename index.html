@@ -1081,6 +1081,44 @@ function clearAllHistory() {
     );
 }
 
+// Hàm xóa sạch báo cáo hiện tại (Xóa Firebase và Xóa nội dung Google Sheet)
+function clearLogs() {
+    // 1. Kiểm tra xem có đang mở sự kiện nào không
+    if (!currentSession || !currentSession.code) {
+        return showToast("Vui lòng kích hoạt hoặc khôi phục một sự kiện để xóa!", "error");
+    }
+
+    // 2. Hiện thông báo xác nhận lớn (Panic Mode)
+    showConfirm(
+        `CẢNH BÁO TỐI CAO: Hành động này sẽ XÓA SẠCH toàn bộ danh sách điểm danh của "${currentSession.title.toUpperCase()}" trên cả Web và Google Sheet. Dữ liệu không thể khôi phục. Bạn chắc chắn?`, 
+        async () => {
+            try {
+                showToast("Đang thực hiện lệnh xóa tổng lực...", "info");
+
+                // A. Xóa dữ liệu trên Firebase
+                await rdb.ref('dynamic_attendance/logs/' + currentSession.code).remove();
+
+                // B. Gửi lệnh xóa sạch hàng trong Google Sheet tới Apps Script
+                const clearSheetUrl = MASTER_SCRIPT_URL + 
+                                     "?action=clearSheet" + 
+                                     "&sheetUrl=" + encodeURIComponent(currentSession.sheetUrl);
+                
+                // Gọi lệnh xóa bằng fetch (no-cors để tránh lỗi bảo mật trình duyệt)
+                fetch(clearSheetUrl, { mode: 'no-cors' });
+
+                // C. Dọn dẹp giao diện ngay lập tức
+                document.getElementById('table-body').innerHTML = "";
+                
+                showToast("Dữ liệu đã được làm sạch hoàn toàn!", "success");
+
+            } catch (e) {
+                console.error(e);
+                showToast("Lỗi hệ thống khi thực hiện lệnh xóa!", "error");
+            }
+        }
+    );
+}
+
 // Gán sự kiện cho nút "Đồng ý" (Chỉ gán 1 lần duy nhất này)
 document.getElementById('confirm-btn-yes').onclick = async function() {
     if (confirmCallback) {
