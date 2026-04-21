@@ -729,7 +729,7 @@ async function submitAttendance() {
     // Cột A: STT (=ROW()-1)
     // Cột B: Thời gian (time)
     // Cột C trở đi: Thông tin thí sinh (...vals)
-    const rowData = ["=ROW()-1", time, ...vals];
+    const rowDataForSheet = ["=ROW()-1", time, ...vals];
 
     const updateUrl = MASTER_SCRIPT_URL + "?action=update" + 
                       "&sheetUrl=" + encodeURIComponent(userSession.sheetUrl) + 
