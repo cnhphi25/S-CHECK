@@ -282,7 +282,7 @@ table th:first-child, table td:first-child {
     inset: 0;
     border-radius: 50%;
     background: conic-gradient(from 0deg, transparent 80%, rgba(99, 102, 241, 0.4) 100%);
-    animation: radar-beam 3s linear infinite;
+    animation: radar-beam 4s linear infinite; /* Đổi từ 3s thành 4s, Radar nhìn "mượt" và chậm rãi hơn tương ứng với thời gian chờ lâu */
 }
 
     </style>
@@ -784,10 +784,11 @@ function checkAuthState() {
 function checkCode(forced) {
     if(!forced) return; 
     
-    // Hiển thị màn hình user ngay (trạng thái chờ)
+    // 1. Hiển thị màn hình chờ ngay lập tức
     showView('user');
+    const loaderText = document.getElementById('loader-text');
     
-    // Xử lý chuẩn hóa mã phòng
+    // Xử lý mã phòng (slug)
     let roomCode = forced.toLowerCase().trim();
     roomCode = roomCode.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a")
                        .replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e")
@@ -798,6 +799,7 @@ function checkCode(forced) {
                        .replace(/đ/g, "d")
                        .replace(/\s+/g, "-");
     
+    // 2. Bắt đầu quá trình quét lâu hơn
     rdb.ref('dynamic_attendance/sessions/' + roomCode).once('value', snap => {
         if(!snap.exists()) {
             showToast("Phòng không tồn tại!", "error");
@@ -808,14 +810,21 @@ function checkCode(forced) {
         
         userSession = snap.val();
 
-        // --- CẬP NHẬT TÊN SỰ KIỆN LÊN MÀN HÌNH CHỜ ---
-        const loaderText = document.getElementById('loader-text');
-        if (loaderText) {
-            loaderText.innerHTML = `ĐANG KẾT NỐI:<br><span class="text-indigo-400 text-[10px] font-black">${userSession.title.toUpperCase()}</span>`;
-        }
-        
-        // Đợi 1 chút để thí sinh kịp nhìn thấy tên sự kiện rồi mới hiện Form
+        // GIAI ĐOẠN 1: Đã thấy tín hiệu (Sau 1.5 giây)
         setTimeout(() => {
+            loaderText.innerHTML = `<span class="text-emerald-400">ĐÃ PHÁT HIỆN TÍN HIỆU...</span>`;
+        }, 1500);
+
+        // GIAI ĐOẠN 2: Hiển thị tên sự kiện (Sau 3 giây)
+        setTimeout(() => {
+            loaderText.innerHTML = `
+                <span class="text-white/40 text-[7px] tracking-[3px]">ĐANG KẾT NỐI VÀO</span><br>
+                <span class="text-indigo-400 text-[11px] font-black italic">${userSession.title.toUpperCase()}</span>`;
+        }, 3000);
+
+        // GIAI ĐOẠN 3: Hoàn tất và hiện Form (Sau 5 giây)
+        setTimeout(() => {
+            // Render Form dữ liệu
             document.getElementById('u-step-2').classList.remove('hidden');
             document.getElementById('u-title').innerText = userSession.title;
             document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
@@ -823,9 +832,10 @@ function checkCode(forced) {
                     <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
                     <input type="text" class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5" placeholder="Nhập ${f}...">
                 </div>`).join('');
-                
+            
+            // Tắt Radar
             hideInitialLoader();
-        }, 1200); // Trì hoãn 1.2 giây để tạo hiệu ứng chuyên nghiệp
+        }, 5000); // 5000ms = 5 giây quay radar
     });
 }
 
