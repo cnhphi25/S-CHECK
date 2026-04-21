@@ -684,16 +684,23 @@ function createSlug(str) {
 // 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
 async function activateSession() {
     const title = document.getElementById('a-title').value.trim();
-    // BỎ DÒNG: const duration = parseInt(...)
     const fields = Array.from(document.querySelectorAll('.field-input')).map(i => i.value.trim()).filter(v => v);
     
-    if(!title) return showToast("Vui lòng nhập tên sự kiện!", "info"); // BỎ kiểm tra duration
+    if(!title) return showToast("Vui lòng nhập tên sự kiện!", "info");
     
     const code = createSlug(title); 
     showToast("Đang khởi tạo hệ thống...", "info");
 
+    // SỬA TẠI ĐÂY: Thêm "STT" vào trước các trường thông tin khi gửi lên Google Script
+    const fieldsForSheet = ["STT", ...fields];
+
     try {
-        const query = new URLSearchParams({ action: "create", title: title, fields: JSON.stringify(fields) });
+        // Gửi fieldsForSheet thay vì fields
+        const query = new URLSearchParams({ 
+            action: "create", 
+            title: title, 
+            fields: JSON.stringify(fieldsForSheet) 
+        });
         const response = await fetch(`${MASTER_SCRIPT_URL}?${query.toString()}`);
         const sheetUrl = await response.text();
         
@@ -736,14 +743,18 @@ async function submitAttendance() {
     const time = new Date().toLocaleString('vi-VN');
     const log = { values: vals, time: time, ts: Date.now() };
 
-    // Lưu Firebase
+    // Lưu Firebase (giữ nguyên để báo cáo trên web không đổi)
     rdb.ref('dynamic_attendance/logs/' + userSession.code).push(log);
 
+    // SỬA TẠI ĐÂY: Tạo mảng dữ liệu theo thứ tự STT | Thời gian | Dữ liệu thí sinh
+    const rowDataForSheet = ["=ROW()-1", time, ...vals];
+
     // Cập nhật Google Sheet Real-time
+    // Lưu ý: Chúng ta để tham số time ở URL là rỗng để tránh bị Google Script tự chèn thêm 1 cột thời gian nữa ở đầu
     const updateUrl = MASTER_SCRIPT_URL + "?action=update" + 
                       "&sheetUrl=" + encodeURIComponent(userSession.sheetUrl) + 
-                      "&time=" + encodeURIComponent(time) + 
-                      "&values=" + encodeURIComponent(JSON.stringify(vals));
+                      "&time=" + // Để trống ở đây vì time đã nằm trong mảng rowDataForSheet
+                      "&values=" + encodeURIComponent(JSON.stringify(rowDataForSheet));
     
     fetch(updateUrl, { mode: 'no-cors' });
 
