@@ -690,7 +690,7 @@ async function activateSession() {
     const code = createSlug(title); 
     showToast("Đang khởi tạo hệ thống...", "info");
 
-    // SỬA TẠI ĐÂY: Phải có đủ "STT" và "Dấu thời gian" trong mảng tiêu đề
+    // SỬA TẠI ĐÂY: Thêm đầy đủ nhãn cho cột A và cột B
     const fieldsForSheet = ["STT", "Dấu thời gian", ...fields];
 
     try {
@@ -704,10 +704,13 @@ async function activateSession() {
         currentSession = sessionData;
         
         showToast("Đã kích hoạt thành công!", "success");
+        
+        // Phần hiển thị mã QR (Giữ nguyên của bạn)
         let roomUrl = window.location.origin + window.location.pathname + "?room=" + code;
         lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
         document.getElementById('qr-container').classList.remove('hidden');
         document.getElementById('qr-code').innerHTML = `<div class="bg-white p-4 rounded-[2rem] flex flex-col items-center"><img src="${lastQRUrl}" class="w-48 h-48 rounded-xl"><div class="mt-4 text-center"><h4 class="text-black text-xl font-black italic uppercase tracking-tighter leading-none">QUÉT MÃ ĐIỂM DANH</h4><p class="text-slate-400 text-[7px] font-bold uppercase tracking-[3px] mt-1.5">S-CHECK PRO SYSTEM</p></div></div>`;
+        
         listenLogs(code);
     } catch (e) { showToast("Lỗi kết nối Google Sheet!", "error"); }
 }
@@ -718,9 +721,14 @@ async function submitAttendance() {
     if(vals.some(v => !v)) return showToast("Điền đủ thông tin!", "info");
     
     const time = new Date().toLocaleString('vi-VN');
+    
+    // Lưu vào Firebase để hiện báo cáo trên web (Giữ nguyên)
     rdb.ref('dynamic_attendance/logs/' + userSession.code).push({ values: vals, time: time, ts: Date.now() });
 
-    // DỮ LIỆU GỬI SANG: Cột 1 là công thức STT, Cột 2 là Thời gian, sau đó mới tới Vals
+    // DỮ LIỆU GỬI SANG SHEET: 
+    // Cột A: STT (=ROW()-1)
+    // Cột B: Thời gian (time)
+    // Cột C trở đi: Thông tin thí sinh (...vals)
     const rowData = ["=ROW()-1", time, ...vals];
 
     const updateUrl = MASTER_SCRIPT_URL + "?action=update" + 
