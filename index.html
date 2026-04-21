@@ -690,29 +690,43 @@ async function activateSession() {
     const code = createSlug(title); 
     showToast("Đang khởi tạo hệ thống...", "info");
 
-    // SỬA TẠI ĐÂY: Thêm đầy đủ nhãn cho cột A và cột B
+    // DÒNG NÀY LÀ QUAN TRỌNG NHẤT: Tạo đúng 2 cột đầu là STT và Dấu thời gian
     const fieldsForSheet = ["STT", "Dấu thời gian", ...fields];
 
     try {
-        const query = new URLSearchParams({ action: "create", title: title, fields: JSON.stringify(fieldsForSheet) });
+        const query = new URLSearchParams({ 
+            action: "create", 
+            title: title, 
+            fields: JSON.stringify(fieldsForSheet) 
+        });
         const response = await fetch(`${MASTER_SCRIPT_URL}?${query.toString()}`);
         const sheetUrl = await response.text();
-        if (!sheetUrl.startsWith("http")) throw new Error(sheetUrl);
         
+        if (!sheetUrl.startsWith("http")) throw new Error(sheetUrl);
+
         const sessionData = { code, title, fields, sheetUrl, ts: Date.now() }; 
         await rdb.ref('dynamic_attendance/sessions/' + code).set(sessionData);
         currentSession = sessionData;
         
         showToast("Đã kích hoạt thành công!", "success");
-        
-        // Phần hiển thị mã QR (Giữ nguyên của bạn)
+
         let roomUrl = window.location.origin + window.location.pathname + "?room=" + code;
         lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
+        
         document.getElementById('qr-container').classList.remove('hidden');
-        document.getElementById('qr-code').innerHTML = `<div class="bg-white p-4 rounded-[2rem] flex flex-col items-center"><img src="${lastQRUrl}" class="w-48 h-48 rounded-xl"><div class="mt-4 text-center"><h4 class="text-black text-xl font-black italic uppercase tracking-tighter leading-none">QUÉT MÃ ĐIỂM DANH</h4><p class="text-slate-400 text-[7px] font-bold uppercase tracking-[3px] mt-1.5">S-CHECK PRO SYSTEM</p></div></div>`;
+        document.getElementById('qr-code').innerHTML = `
+            <div class="bg-white p-4 rounded-[2rem] flex flex-col items-center">
+                <img src="${lastQRUrl}" class="w-48 h-48 rounded-xl">
+                <div class="mt-4 text-center">
+                    <h4 class="text-black text-xl font-black italic uppercase tracking-tighter leading-none">QUÉT MÃ ĐIỂM DANH</h4>
+                    <p class="text-slate-400 text-[7px] font-bold uppercase tracking-[3px] mt-1.5">S-CHECK PRO SYSTEM</p>
+                </div>
+            </div>`;
         
         listenLogs(code);
-    } catch (e) { showToast("Lỗi kết nối Google Sheet!", "error"); }
+    } catch (e) {
+        showToast("Lỗi kết nối Google Sheet!", "error");
+    }
 }
 
 // 2. GỬI ĐIỂM DANH & CẬP NHẬT SHEET (GET - NO CORS)
@@ -722,14 +736,15 @@ async function submitAttendance() {
     
     const time = new Date().toLocaleString('vi-VN');
     
-    // Lưu vào Firebase để hiện báo cáo trên web (Giữ nguyên)
-    rdb.ref('dynamic_attendance/logs/' + userSession.code).push({ values: vals, time: time, ts: Date.now() });
+    // Lưu Firebase cho Web
+    rdb.ref('dynamic_attendance/logs/' + userSession.code).push({ 
+        values: vals, 
+        time: time, 
+        ts: Date.now() 
+    });
 
-    // DỮ LIỆU GỬI SANG SHEET: 
-    // Cột A: STT (=ROW()-1)
-    // Cột B: Thời gian (time)
-    // Cột C trở đi: Thông tin thí sinh (...vals)
-    const rowDataForSheet = ["=ROW()-1", time, ...vals];
+    // DỮ LIỆU GỬI SANG SHEET PHẢI KHỚP: Cột 1 STT | Cột 2 Thời gian | Còn lại là dữ liệu
+    const rowData = ["=ROW()-1", time, ...vals];
 
     const updateUrl = MASTER_SCRIPT_URL + "?action=update" + 
                       "&sheetUrl=" + encodeURIComponent(userSession.sheetUrl) + 
