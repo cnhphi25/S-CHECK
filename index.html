@@ -801,24 +801,31 @@ function checkCode(forced) {
     rdb.ref('dynamic_attendance/sessions/' + roomCode).once('value', snap => {
         if(!snap.exists()) {
             showToast("Phòng không tồn tại!", "error");
-            hideInitialLoader(); // Vẫn phải ẩn loader để thấy thông báo lỗi
+            hideInitialLoader(); 
             setTimeout(() => { window.location.href = window.location.pathname; }, 2000);
             return;
         }
         
         userSession = snap.val();
+
+        // --- CẬP NHẬT TÊN SỰ KIỆN LÊN MÀN HÌNH CHỜ ---
+        const loaderText = document.getElementById('loader-text');
+        if (loaderText) {
+            loaderText.innerHTML = `ĐANG KẾT NỐI:<br><span class="text-indigo-400 text-[10px] font-black">${userSession.title.toUpperCase()}</span>`;
+        }
         
-        // Render form thông tin
-        document.getElementById('u-step-2').classList.remove('hidden');
-        document.getElementById('u-title').innerText = userSession.title;
-        document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
-            <div class="space-y-1">
-                <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
-                <input type="text" class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5" placeholder="Nhập ${f}...">
-            </div>`).join('');
-            
-        // Đã tải xong form, ẩn loader
-        hideInitialLoader();
+        // Đợi 1 chút để thí sinh kịp nhìn thấy tên sự kiện rồi mới hiện Form
+        setTimeout(() => {
+            document.getElementById('u-step-2').classList.remove('hidden');
+            document.getElementById('u-title').innerText = userSession.title;
+            document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
+                <div class="space-y-1">
+                    <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
+                    <input type="text" class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5" placeholder="Nhập ${f}...">
+                </div>`).join('');
+                
+            hideInitialLoader();
+        }, 1200); // Trì hoãn 1.2 giây để tạo hiệu ứng chuyên nghiệp
     });
 }
 
@@ -1193,11 +1200,10 @@ window.onload = () => {
     const room = params.get('room');
     
     if (room) {
-        // Nếu quét QR (có room)
-        document.getElementById('loader-text').innerText = "Đang kết nối phòng: " + room.toUpperCase();
+        // Chữ hiện ra lúc đang tải dữ liệu từ Firebase
+        document.getElementById('loader-text').innerText = "ĐANG TÌM KIẾM TÍN HIỆU PHÒNG...";
         checkCode(room);
     } else {
-        // Nếu vào trang chủ (Admin)
         document.getElementById('loader-text').innerText = "Đang xác thực quyền quản trị...";
         checkAuthState();
     }
