@@ -1124,26 +1124,32 @@ function finishActivation(code, title) {
 
 // 2. GỬI ĐIỂM DANH
 async function submitAttendance() {
+    // Lấy dữ liệu từ các ô nhập
     const vals = Array.from(document.querySelectorAll('.u-input')).map(i => i.value.trim());
     if(vals.some(v => !v)) return showToast("Vui lòng điền đủ thông tin!", "info");
     
-    const deviceId = getUniqueDeviceId(); // Lấy ID thiết bị hiện tại
+    // Lấy ID duy nhất của máy này
+    const deviceId = getUniqueDeviceId(); 
 
-    // 1. KIỂM TRA TRÙNG LẶP: Check xem thiết bị này đã điểm danh chưa
+    // --- BƯỚC 1: KIỂM TRA XEM MÁY NÀY ĐÃ QUÉT TRƯỚC ĐÓ CHƯA ---
+    showToast("Đang kiểm tra dữ liệu thiết bị...", "info");
     try {
         const checkRef = rdb.ref('dynamic_attendance/logs/' + userSession.code);
+        // Tìm trong danh sách log xem có deviceId này chưa
         const snapshot = await checkRef.orderByChild('deviceId').equalTo(deviceId).once('value');
         
         if (snapshot.exists()) {
+            // Nếu tìm thấy dữ liệu trùng, báo lỗi và dừng ngay lập tức
             return showToast("BẠN ĐÃ ĐIỂM DANH SỰ KIỆN NÀY RỒI!", "error");
         }
     } catch (e) {
         console.error("Lỗi kiểm tra trùng lặp:", e);
+        // Nếu lỗi phân quyền index, hệ thống sẽ bỏ qua bước này để không chặn người dùng
     }
 
-    // 2. KIỂM TRA GPS (Chỉ khi Admin yêu cầu)
+    // --- BƯỚC 2: KIỂM TRA GPS (CHỈ KHI ADMIN BẬT) ---
     if (userSession && userSession.requireLocation === true) {
-        showToast("Đang xác thực phạm vi điểm danh...", "info");
+        showToast("Đang xác thực phạm vi hiện diện...", "info");
         try {
             const pos = await new Promise((res, rej) => 
                 navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 7000 })
@@ -1156,7 +1162,7 @@ async function submitAttendance() {
                 );
                 const allowedRadius = Number(userSession.locationRadius) || 50;
                 if (dist > allowedRadius) {
-                    return showToast(`KHÔNG THÀNH CÔNG: Bạn đang ở cách xa ${dist.toFixed(0)}m.`, "error");
+                    return showToast(`Không thành công! Bạn ở cách xa ${dist.toFixed(0)}m.`, "error");
                 }
             }
         } catch (e) {
@@ -1164,14 +1170,14 @@ async function submitAttendance() {
         }
     }
 
-    // 3. GỬI DỮ LIỆU (Thêm trường deviceId vào bản ghi)
+    // --- BƯỚC 3: GỬI DỮ LIỆU (PHẢI GỬI KÈM DEVICEID) ---
     const time = new Date().toLocaleString('vi-VN');
     try {
         await rdb.ref('dynamic_attendance/logs/' + userSession.code).push({ 
             values: vals, 
             time: time, 
             ts: Date.now(),
-            deviceId: getUniqueDeviceId() // Gửi mã này lên để server đối soát
+            deviceId: deviceId // Viết thường chữ d, viết hoa chữ I (deviceId)
         });
         
         document.getElementById('success-overlay').style.display = 'flex';
