@@ -856,8 +856,7 @@ input:focus {
                     <div id="radius-setting-container" class="flex items-center justify-between gap-3 opacity-50 transition-all duration-500">
                         <span class="text-[9px] font-bold text-slate-500 uppercase">Bán kính (m):</span>
                         <div class="flex items-center gap-2">
-                            <input type="number" id="a-location-radius" value="50" min="5" 
-                                class="w-16 p-2 text-center rounded-xl bg-black/40 border border-white/10 text-[11px] font-black text-indigo-400 outline-none focus:border-indigo-500/50">
+                            <input type="number" id="a-location-radius" value="50" min="50" onblur="saveRadiusSettings()" onkeydown="if(event.key === 'Enter') saveRadiusSettings()" class="w-16 p-2 text-center rounded-xl bg-black/40 border border-white/10 text-[11px] font-black text-indigo-400 outline-none focus:border-indigo-500/50">
                             <button onclick="saveRadiusSettings()" class="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[9px] font-black px-3 py-2 rounded-xl border border-indigo-500/30 transition-all">LƯU</button>
                         </div>
                     </div>
@@ -1035,12 +1034,19 @@ function createSlug(str) {
 
 // 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
 async function activateSession() {
+    const radiusCheck = parseInt(document.getElementById('a-location-radius').value);
+    pendingRadius = (isNaN(radiusCheck) || radiusCheck < 50) ? 50 : radiusCheck;
     const user = auth.currentUser;
     if (!user) return showToast("Bạn chưa đăng nhập!", "error");
 
     const title = document.getElementById('a-title').value.trim();
     const fields = Array.from(document.querySelectorAll('.field-input')).map(i => i.value.trim()).filter(v => v);
     const isGpsRequired = document.getElementById('a-require-location').checked;
+
+        // THÊM ĐOẠN NÀY: Kiểm tra cuối cùng trước khi ghi vào database
+    let finalRadius = parseInt(document.getElementById('a-location-radius').value);
+    if (isNaN(finalRadius) || finalRadius < 50) finalRadius = 50;
+    pendingRadius = finalRadius; 
 
     if(!title) return showToast("Vui lòng nhập tên sự kiện!", "info");
     
@@ -1834,38 +1840,29 @@ async function handleAuth() {
     }
 }
 
-// --- XỬ LÝ PHÍM ENTER ---
+// --- XỬ LÝ PHÍM ENTER CHO TOÀN BỘ HỆ THỐNG ---
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') {
-        // 1. Nếu đang ở màn hình Đăng nhập (Auth)
+        
+        // 1. MÀN HÌNH ĐĂNG NHẬP (AUTH): VẪN CHO PHÉP nhấn Enter để đăng nhập nhanh
         const viewAuth = document.getElementById('view-auth');
         if (viewAuth && !viewAuth.classList.contains('hidden')) {
             handleAuth();
             return;
         }
 
-        // 2. Nếu đang ở màn hình Người dùng (User)
+        // 2. MÀN HÌNH NGƯỜI DÙNG ĐIỀN FORM: VẪN CHO PHÉP nhấn Enter để gửi điểm danh
         const viewUser = document.getElementById('view-user');
         if (viewUser && !viewUser.classList.contains('hidden')) {
-            // Nếu đang ở Bước 1: Nhập mã phòng
-            const step1 = document.getElementById('u-step-1');
-            if (step1 && !step1.classList.contains('hidden')) {
-                checkCode();
-            } 
-            // Nếu đang ở Bước 2: Điền form thông tin
-            else {
-                submitAttendance();
-            }
+            submitAttendance();
             return;
         }
 
-        // 3. Nếu đang ở màn hình Admin (Tạo sự kiện)
+        // 3. MÀN HÌNH ADMIN (CẤU HÌNH): ĐÃ HỦY ENTER ĐỂ TRÁNH KÍCH HOẠT NHẦM
         const viewAdmin = document.getElementById('view-admin');
         if (viewAdmin && !viewAdmin.classList.contains('hidden')) {
-            // Chỉ kích hoạt Enter khi đang focus vào các ô nhập liệu bên cột trái (Tạo sự kiện)
-            if (document.activeElement.closest('.lg\\:col-span-4')) {
-                activateSession();
-            }
+            // Không làm gì cả, buộc Admin phải dùng chuột bấm nút "Kích hoạt hệ thống"
+            // Việc này giúp bạn kiểm tra kỹ thông tin trước khi tạo mã QR.
             return;
         }
     }
@@ -2621,54 +2618,48 @@ function finishActivationProcess(code, title) {
 
 async function saveRadiusSettings() {
     const radiusInput = document.getElementById('a-location-radius');
-    const newRadius = parseInt(radiusInput.value);
+    const val = parseInt(radiusInput.value);
 
-    // 1. Kiểm tra tính hợp lệ của con số
-    if (isNaN(newRadius) || newRadius < 5) {
-        showToast("Bán kính tối thiểu là 5m!", "error");
-        radiusInput.value = pendingRadius; 
-        return;
+    // BƯỚC 1: KIỂM TRA ĐIỀU KIỆN (CHẶN TẠI ĐÂY)
+    if (isNaN(val) || val < 50) {
+        // Nhảy số trên màn hình về 50
+        radiusInput.value = 50; 
+        // Hiện thông báo đỏ
+        showToast("BÁN KÍNH BẢO MẬT TỐI THIỂU LÀ 50M!", "error");
+        
+        // DỪNG TOÀN BỘ HÀM (Không lưu, không hiện thông báo xanh)
+        return; 
     }
 
-    pendingRadius = newRadius;
+    // BƯỚC 2: CHỈ CHẠY XUỐNG ĐÂY NẾU SỐ NHẬP VÀO >= 50
+    pendingRadius = val;
 
-    // 2. Nếu đã kích hoạt session
     if (currentSession && currentSession.code) {
-        const btn = event.currentTarget;
-        const originalText = btn.innerHTML;
-        
+        const btn = (window.event && window.event.type === 'click') 
+                    ? window.event.currentTarget 
+                    : document.querySelector('button[onclick="saveRadiusSettings()"]');
+
         try {
-            // Cập nhật lên Firebase
+            // Thực hiện lưu vào Firebase
             await rdb.ref('dynamic_attendance/sessions/' + currentSession.code).update({
-                locationRadius: newRadius
+                locationRadius: val
             });
             
-            currentSession.locationRadius = newRadius;
-            showToast(`Đã cập nhật bán kính: ${newRadius}m`, "success");
+            currentSession.locationRadius = val;
+            // Chỉ hiện thông báo xanh khi lưu thành công con số hợp lệ
+            showToast(`ĐÃ CẬP NHẬT BÁN KÍNH: ${val}M`, "success");
             
-            // Hiệu ứng nút bấm thành công
-            btn.innerHTML = "ĐÃ LƯU";
-            btn.style.background = "#10b981";
-            setTimeout(() => { 
-                btn.innerHTML = "LƯU"; 
-                btn.style.background = ""; 
-            }, 1000);
-
-        } catch (e) {
-            console.error("Lỗi Firebase:", e);
-            // Hiện lỗi thật thay vì câu thông báo gây hiểu lầm
-            if (e.message.includes("PERMISSION_DENIED")) {
-                showToast("Lỗi: Bạn không có quyền sửa sự kiện này (Kiểm tra Firebase Rules)", "error");
-            } else {
-                showToast("Lỗi kết nối máy chủ!", "error");
+            if (btn) {
+                btn.innerHTML = "ĐÃ LƯU";
+                btn.style.background = "#10b981";
+                setTimeout(() => { btn.innerHTML = "LƯU"; btn.style.background = ""; }, 1000);
             }
+        } catch (e) {
+            showToast("Lỗi kết nối máy chủ!", "error");
         }
     } else {
-        // Nếu chưa kích hoạt, chỉ lưu tạm vào máy
-        showToast(`Đã ghi nhận ${newRadius}m. Bấm Kích hoạt để áp dụng.`, "info");
-        const btn = event.currentTarget;
-        btn.innerHTML = "OK";
-        setTimeout(() => { btn.innerHTML = "LƯU"; }, 1000);
+        // Nếu chưa kích hoạt sự kiện, chỉ ghi nhận để đó
+        showToast(`ĐÃ GHI NHẬN ${val}M. BẤM KÍCH HOẠT ĐỂ ÁP DỤNG.`, "info");
     }
 }
 
