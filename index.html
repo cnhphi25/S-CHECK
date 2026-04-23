@@ -1127,15 +1127,26 @@ async function submitAttendance() {
     const vals = Array.from(document.querySelectorAll('.u-input')).map(i => i.value.trim());
     if(vals.some(v => !v)) return showToast("Vui lòng điền đủ thông tin!", "info");
     
-    // --- BẮT ĐẦU KIỂM TRA GPS (CHỈ KHI ADMIN YÊU CẦU) ---
+    const deviceId = getUniqueDeviceId(); // Lấy ID thiết bị hiện tại
+
+    // 1. KIỂM TRA TRÙNG LẶP: Check xem thiết bị này đã điểm danh chưa
+    try {
+        const checkRef = rdb.ref('dynamic_attendance/logs/' + userSession.code);
+        const snapshot = await checkRef.orderByChild('deviceId').equalTo(deviceId).once('value');
+        
+        if (snapshot.exists()) {
+            return showToast("BẠN ĐÃ ĐIỂM DANH SỰ KIỆN NÀY RỒI!", "error");
+        }
+    } catch (e) {
+        console.error("Lỗi kiểm tra trùng lặp:", e);
+    }
+
+    // 2. KIỂM TRA GPS (Chỉ khi Admin yêu cầu)
     if (userSession && userSession.requireLocation === true) {
         showToast("Đang xác thực phạm vi điểm danh...", "info");
         try {
             const pos = await new Promise((res, rej) => 
-                navigator.geolocation.getCurrentPosition(res, rej, { 
-                    enableHighAccuracy: true,
-                    timeout: 7000 
-                })
+                navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 7000 })
             );
             
             if (userSession.adminLocation) {
@@ -1143,27 +1154,26 @@ async function submitAttendance() {
                     pos.coords.latitude, pos.coords.longitude,
                     userSession.adminLocation.lat, userSession.adminLocation.lng
                 );
-
                 const allowedRadius = Number(userSession.locationRadius) || 50;
                 if (dist > allowedRadius) {
-                    return showToast(`KHÔNG THÀNH CÔNG: Bạn đang đứng cách vị trí yêu cầu ${dist.toFixed(0)}m.`, "error");
+                    return showToast(`KHÔNG THÀNH CÔNG: Bạn đang ở cách xa ${dist.toFixed(0)}m.`, "error");
                 }
             }
         } catch (e) {
-            // Hiện lỗi tiếng Việt nếu sinh viên từ chối GPS hoặc GPS lỗi
             return showToast(getGpsErrorMessage(e), "error");
         }
     }
-    // --- KẾT THÚC KIỂM TRA GPS ---
 
-    // TIẾN HÀNH GỬI DỮ LIỆU ĐIỂM DANH
+    // 3. GỬI DỮ LIỆU (Thêm trường deviceId vào bản ghi)
     const time = new Date().toLocaleString('vi-VN');
     try {
         await rdb.ref('dynamic_attendance/logs/' + userSession.code).push({ 
             values: vals, 
             time: time, 
-            ts: Date.now() 
+            ts: Date.now(),
+            deviceId: getUniqueDeviceId() // Gửi mã này lên để server đối soát
         });
+        
         document.getElementById('success-overlay').style.display = 'flex';
         confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
     } catch (e) {
@@ -2667,6 +2677,17 @@ function getGpsErrorMessage(err) {
         default:
             return "Lỗi GPS không xác định. Vui lòng thử lại.";
     }
+}
+
+// Hàm lấy hoặc tạo mã định danh thiết bị (Device ID)
+function getUniqueDeviceId() {
+    let deviceId = localStorage.getItem('scheck_device_fingerprint');
+    if (!deviceId) {
+        // Tạo chuỗi ngẫu nhiên kết hợp với thời gian để làm ID
+        deviceId = 'dev-' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        localStorage.setItem('scheck_device_fingerprint', deviceId);
+    }
+    return deviceId;
 }
 
 </script>
