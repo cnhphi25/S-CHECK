@@ -878,34 +878,50 @@ input:focus {
 </div>
 
 <script>
-// --- BẢO MẬT TINH CHỈNH: CHẶN PHÍM TẮT VÀ CHUỘT PHẢI ---
+// --- HỆ THỐNG BẢO MẬT TỐI CAO: CHỐNG INSPECT & REDIRECT ---
 (function() {
     function destroyWeb() {
-        document.documentElement.innerHTML = "";
+        // Chuyển hướng ngay lập tức về trang trắng
         window.location.replace("about:blank");
     }
 
-    // 1. Chặn phím tắt (F12, Ctrl+Shift+I, Ctrl+U...)
+    // 1. Chặn và xử lý phím tắt
     window.addEventListener('keydown', function(e) {
-        if (
-            e.keyCode === 123 || // F12
-            (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)) || // Ctrl+Shift+I/J/C
-            (e.ctrlKey && e.keyCode === 85) // Ctrl+U (Xem nguồn trang)
-        ) {
+        // Kiểm tra các phím xâm nhập
+        const isF12 = (e.keyCode === 123);
+        const isDevTools = (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74 || e.keyCode === 67)); // Ctrl+Shift+I/J/C
+        const isViewSource = (e.ctrlKey && e.keyCode === 85); // Ctrl+U
+        const isSavePage = (e.ctrlKey && e.keyCode === 83);   // Ctrl+S
+
+        if (isF12 || isDevTools || isViewSource || isSavePage) {
             e.preventDefault();
-            // showToast("Hành động bị chặn vì lý do bảo mật!", "error"); // Tùy chọn hiện thông báo thay vì hủy web
+            e.stopPropagation();
+            destroyWeb();
             return false;
         }
+
+        // GIỮ NGUYÊN: Không chặn Ctrl + (+) hoặc Ctrl + (-) hoặc Ctrl + 0 (Đây là các phím Zoom)
+        // Trình duyệt mặc định xử lý zoom qua keyCode 187, 189, 48 hoặc 107, 109, 96
     }, true);
 
-    // 2. Chặn chuột phải
-    document.addEventListener('contextmenu', e => e.preventDefault());
+    // 2. Chặn chuột phải (để không dùng được menu Inspect)
+    document.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+    });
 
-    // 3. Chặn kéo thả ảnh (Tránh kéo mã QR ra ngoài để soi)
+    // 3. Chặn kéo thả ảnh/mã QR (Tránh soi mã)
     document.addEventListener('dragstart', e => e.preventDefault());
 
-    // 4. (Tùy chọn) Chống bôi đen văn bản để copy
-    // document.addEventListener('selectstart', e => e.preventDefault());
+    // 4. Phát hiện DevTools mở bằng cách đo kích thước cửa sổ (Tùy chọn)
+    // Nếu người dùng mở bằng menu trình duyệt thay vì phím tắt
+    setInterval(function() {
+        const threshold = 160;
+        if (window.outerWidth - window.innerWidth > threshold || 
+            window.outerHeight - window.innerHeight > threshold) {
+            // Nếu phát hiện cửa sổ bị chiếm dụng bởi Console
+            // destroyWeb(); // Bỏ comment nếu muốn cực đoan hơn
+        }
+    }, 1000);
 })();
 // --- CONFIG FIREBASE ---
 const firebaseConfig = {
