@@ -969,18 +969,29 @@ function checkCode(forced) {
 
         // GIAI ĐOẠN 3: Hoàn tất và hiện Form (Tổng cộng 2 giây)
         setTimeout(() => {
-            // Render Form dữ liệu
+            // Render Form dữ liệu với tiêu đề mục rõ ràng
             document.getElementById('u-step-2').classList.remove('hidden');
             document.getElementById('u-title').innerText = userSession.title;
+            
             document.getElementById('u-form').innerHTML = userSession.fields.map(f => `
-                <div class="space-y-1">
-                    <label class="text-[10px] font-black text-slate-500 uppercase ml-4">${f}</label>
-                    <input type="text" class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5" placeholder="Nhập ${f}...">
+                <div class="space-y-2 mb-5 group">
+                    <!-- Tên mục phía trên -->
+                    <div class="flex items-center gap-2 ml-4">
+                        <div class="w-1.5 h-1.5 bg-indigo-500 rounded-full group-focus-within:shadow-[0_0_8px_rgba(99,102,241,1)] transition-all"></div>
+                        <label class="text-[11px] font-black text-indigo-400 uppercase tracking-[2px]">
+                            ${f}
+                        </label>
+                    </div>
+                    
+                    <!-- Nội dung nhập cho người dùng -->
+                    <input type="text" 
+                        class="u-input w-full p-5 rounded-[25px] font-bold text-lg bg-white/5 border border-white/5 focus:border-indigo-500/30 focus:bg-white/10 outline-none transition-all placeholder:text-white/10" 
+                        placeholder="Nhập nội dung ${f} tại đây...">
                 </div>`).join('');
             
-            // Tắt Radar
+            // Tắt Radar loading
             hideInitialLoader();
-        }, 2000); 
+        }, 2000);
     });
 }
 
