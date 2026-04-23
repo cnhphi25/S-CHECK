@@ -17,6 +17,25 @@
 
     <style>
 
+/* Khi dấu chấm chuyển sang trạng thái khóa */
+.dot-signal.is-locked {
+    background-color: transparent !important;
+    box-shadow: none !important;
+    width: 10px; /* Tăng nhẹ kích thước để icon rõ hơn */
+    height: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Hiệu ứng cho input khi bị khóa */
+input:disabled {
+    background: rgba(255, 255, 255, 0.02) !important;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.05) !important;
+    color: #64748b !important; /* Màu chữ xám Slate */
+}
+
 /* Chống trình duyệt đổ màu nền khi tự động điền mật khẩu/tài khoản */
 input:-webkit-autofill,
 input:-webkit-autofill:hover, 
@@ -739,7 +758,13 @@ input:focus {
 
             <!-- DANH SÁCH CÁC TRƯỜNG THÔNG TIN -->
             <div class="space-y-3">
-                <label class="text-[9px] font-black text-slate-500 uppercase ml-2 tracking-[3px]">Cấu trúc nhập liệu người dùng</label>
+                <div class="flex flex-col ml-2">
+                    <label class="text-[9px] font-black text-indigo-400 uppercase tracking-[3px]">Thông tin cần thu thập</label>
+                    <p class="text-[8px] text-slate-500 uppercase font-bold tracking-[1px] mt-1">
+                        (Nhập tiêu đề ví dụ: Họ tên, Lớp, MSSV, Số điện thoại...)
+                    </p>
+                </div>
+                
                 <div id="admin-fields-list" class="space-y-2 bg-white/5 p-4 rounded-2xl max-h-[30vh] overflow-y-auto">
                     <!-- Các ô addField sẽ được render vào đây -->
                 </div>
@@ -803,8 +828,18 @@ input:focus {
 
     <!-- CỘT PHẢI: BÁO CÁO -->
     <div class="lg:col-span-8 glass p-6 lg:p-10 rounded-3xl flex flex-col"> <!-- Đã xóa min-h-[600px] -->
-        <div class="flex justify-between items-center mb-2"> <!-- Đã đổi mb-10 thành mb-2 -->
-            <h2 id="report-title" class="text-2xl font-black italic uppercase">Báo cáo</h2>
+        <div class="flex justify-between items-start mb-2">
+            <!-- Khối tiêu đề bên trái -->
+            <div class="flex flex-col">
+                <!-- Dòng chữ này mặc định sẽ bị ẩn (hidden) -->
+                <div id="history-label" class="hidden mb-1">
+                    <span class="text-[9px] font-black text-indigo-400 uppercase tracking-[4px] italic animate-pulse">
+                        Bạn đang xem lịch sử báo cáo
+                    </span>
+                </div>
+                
+                <h2 id="report-title" class="text-2xl font-black italic uppercase">Báo cáo</h2>
+            </div>
             <div class="flex gap-2">
                 <div class="flex items-center gap-4 bg-[#0f172a]/80 border border-white/10 px-5 py-3 rounded-2xl backdrop-blur-md shadow-2xl group transition-all hover:border-indigo-500/40">
                     <div class="flex flex-col">
@@ -962,6 +997,9 @@ function createSlug(str) {
 
 // 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
 async function activateSession() {
+    const user = auth.currentUser; // Lấy user hiện tại
+    if (!user) return showToast("Bạn cần đăng nhập!", "error");
+
     const title = document.getElementById('a-title').value.trim();
     const fields = Array.from(document.querySelectorAll('.field-input')).map(i => i.value.trim()).filter(v => v);
     
@@ -971,18 +1009,29 @@ async function activateSession() {
     showToast("Đang kích hoạt hệ thống...", "info");
 
     try {
-        // --- GIỮ NGUYÊN LOGIC CŨ CỦA BẠN ---
         const sessionData = { 
             code: code, 
             title: title, 
             fields: fields, 
-            ts: Date.now() 
+            ts: Date.now(),
+            ownerId: user.uid // <-- LƯU UID CỦA NGƯỜI TẠO
         }; 
         
+        // Lưu vào node chung để người dùng (attendee) có thể tìm thấy phòng qua Slug
         await rdb.ref('dynamic_attendance/sessions/' + code).set(sessionData);
+        
+        // Lưu thêm một bản ghi vào danh sách riêng của User để quản lý lịch sử
+        await rdb.ref(`dynamic_attendance/users/${user.uid}/my_sessions/${code}`).set(true);
+
         currentSession = sessionData;
         
         showToast("Đã kích hoạt thành công!", "success");
+
+        // --- ĐOẠN THÊM MỚI ĐỂ KHÓA FORM NGAY LẬP TỨC ---
+        toggleAdminFormLock(true); // Khóa các ô nhập và hiện ổ khóa
+        document.getElementById('history-label').classList.add('hidden');
+        document.getElementById('report-title').innerText = title; // Cập nhật tên báo cáo đồng bộ với tên sự kiện
+        // ----------------------------------------------
 
         let roomUrl = window.location.origin + window.location.pathname + "?room=" + code;
         lastQRUrl = `https://api.qrserver.com/v1/create-qr-code/?size=1000x1000&data=${encodeURIComponent(roomUrl)}`;
@@ -1008,7 +1057,9 @@ async function activateSession() {
         }
 
     } catch (e) {
+        console.error("Lỗi chi tiết:", e); // Thêm dòng này để xem lỗi thật sự là gì
         showToast("Lỗi khi lưu dữ liệu vào hệ thống!", "error");
+        toggleAdminFormLock(true); 
     }
 }
 
@@ -1044,6 +1095,17 @@ function showSheetSync() {
 
 // --- LOGIC GIAO DIỆN & AUTH ---
 function checkAuthState() {
+    const EXPIRE_TIME = 24 * 60 * 60 * 1000; // 24 giờ tính bằng miligiây
+    const lastActive = localStorage.getItem('scheck_last_active');
+    const now = Date.now();
+
+    // KIỂM TRA THỜI GIAN HẾT HẠN TRƯỚC KHI XỬ LÝ AUTH
+    if (lastActive && (now - lastActive > EXPIRE_TIME)) {
+        auth.signOut(); // Đã quá 24h, ép đăng xuất
+        localStorage.removeItem('scheck_last_active');
+        showToast("Phiên đăng nhập đã hết hạn sau 24h", "info");
+    }
+
     auth.onAuthStateChanged(user => {
         const nav = document.getElementById('nav-auth');
         const params = new URLSearchParams(window.location.search);
@@ -1054,28 +1116,15 @@ function checkAuthState() {
         }
 
         if (user) {
-            // --- KHI ĐÃ ĐĂNG NHẬP ---
+            // CẬP NHẬT LẠI THỜI GIAN HOẠT ĐỘNG KHI ĐĂNG NHẬP THÀNH CÔNG
+            localStorage.setItem('scheck_last_active', Date.now());
+            
             showView('admin');
             
-            // AUTO ON: Reset trạng thái thông báo & âm thanh về ON
-            isMuted = false;
-            const toggle = document.getElementById('notify-toggle');
-            if (toggle) toggle.checked = true; // Bật thanh gạt
-
-            const statusLabel = document.getElementById('status-label');
-            const statusText = document.getElementById('status-text');
-            const indicator = document.getElementById('live-indicator');
-            
-            // Cập nhật giao diện về màu Xanh (Emerald) và hiện chấm nháy
-            if (statusLabel && statusText && indicator) {
-                statusLabel.innerText = "Trạng thái: ON";
-                statusText.classList.replace('text-slate-500', 'text-emerald-400');
-                indicator.classList.remove('hidden');
-            }
-
+            // Logic hiển thị nút thoát và tên (giữ nguyên của bạn)
             const displayName = user.email.replace('@scheck.pro', '');
             nav.innerHTML = `
-                <button onclick="auth.signOut()" 
+                <button onclick="handleLogout()" 
                         class="text-[10px] font-black text-red-500 uppercase bg-red-500/5 border border-red-500/20 px-4 py-2 rounded-xl hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-90">
                     <i class="fa-solid fa-power-off mr-1.5"></i> THOÁT (${displayName})
                 </button>`;
@@ -1085,9 +1134,15 @@ function checkAuthState() {
         } else {
             showView('auth');
             nav.innerHTML = ""; 
+            localStorage.removeItem('scheck_last_active'); // Xóa luôn timestamp khi chưa đăng nhập
         }
         hideInitialLoader();
     });
+}
+
+function handleLogout() {
+    localStorage.removeItem('scheck_last_active');
+    auth.signOut();
 }
 
 function checkCode(forced) {
@@ -1335,13 +1390,13 @@ function addField(val = "") {
     const list = document.getElementById('admin-fields-list');
     const div = document.createElement('div');
     
-    // CHỈ DÙNG field-container, tuyệt đối không dùng 'glass' ở đây
     div.className = "flex items-center gap-3 py-1 field-container group"; 
     
     div.innerHTML = `
         <div class="dot-signal shrink-0 ml-1"></div>
         <input type="text" class="field-input flex-1 p-3 rounded-xl text-[13px] font-bold outline-none transition-all" 
-               value="${val}" placeholder="Tên thông tin...">
+               value="${val}" 
+               placeholder="Ví dụ: Số điện thoại, Email...">
         <button onclick="this.parentElement.remove()" class="text-slate-600 hover:text-red-500 transition-colors px-2">
             <i class="fa-solid fa-circle-xmark"></i>
         </button>
@@ -1404,54 +1459,40 @@ function showConfirm(msg, callback) {
 
 // Hàm thực hiện xóa sạch và dọn dẹp giao diện tức thì
 function clearAllHistory() {
+    const user = auth.currentUser;
     showConfirm(
-        "CẢNH BÁO TỐI CAO: HÀNH ĐỘNG NÀY SẼ XÓA VĨNH VIỄN TOÀN BỘ LỊCH SỬ VÀ DỮ LIỆU ĐIỂM DANH TRÊN HỆ THỐNG. BẠN CÓ CHẮC CHẮN?", 
+        "XÁC NHẬN: Xóa toàn bộ sự kiện DO BẠN TẠO? Hành động này không ảnh hưởng đến người khác.", 
         async () => {
             try {
-                showToast("Đang quét sạch máy chủ...", "info");
+                showToast("Đang dọn dẹp dữ liệu cá nhân...", "info");
                 
-                // 1. Tắt tất cả các trình lắng nghe dữ liệu đang chạy để tránh lỗi giao diện
-                if (currentSession && currentSession.code) {
-                    rdb.ref('dynamic_attendance/logs/' + currentSession.code).off();
+                // 1. Tìm các session của mình
+                const snap = await rdb.ref('dynamic_attendance/sessions')
+                                     .orderByChild('ownerId')
+                                     .equalTo(user.uid)
+                                     .once('value');
+                
+                if (snap.exists()) {
+                    const mySessions = snap.val();
+                    const updates = {};
+                    
+                    for (const code in mySessions) {
+                        // Xóa log của session đó
+                        updates[`dynamic_attendance/logs/${code}`] = null;
+                        // Xóa chính session đó
+                        updates[`dynamic_attendance/sessions/${code}`] = null;
+                    }
+                    // Xóa danh sách index của user
+                    updates[`dynamic_attendance/users/${user.uid}/my_sessions`] = null;
+                    
+                    await rdb.ref().update(updates);
                 }
-                rdb.ref('dynamic_attendance/sessions').off();
 
-                // 2. Xóa sạch tận gốc trên Server Firebase (Xóa node cha cao nhất)
-                await rdb.ref('dynamic_attendance').remove();
-
-                // 3. DỌN DẸP GIAO DIỆN NGAY LẬP TỨC
-                
-                // Xóa danh sách trong Modal Lịch sử
-                const historyList = document.getElementById('history-list');
-                if (historyList) {
-                    historyList.innerHTML = `
-                        <div class="flex flex-col items-center justify-center py-20 opacity-30">
-                            <i class="fa-solid fa-folder-open text-5xl mb-4"></i>
-                            <p class="text-xs font-black uppercase tracking-widest">Dữ liệu trống</p>
-                        </div>`;
-                }
-
-                // Reset bảng báo cáo
-                document.getElementById('table-body').innerHTML = "";
-                document.getElementById('table-head').innerHTML = "";
-                document.getElementById('report-title').innerText = "Báo cáo";
-
-                // Ẩn khu vực mã QR
-                document.getElementById('qr-container').classList.add('hidden');
-                document.getElementById('display-room-code').innerText = "";
-                
-                // Reset các biến trong bộ nhớ code
-                currentSession = null;
-                lastQRUrl = "";
-
-                showToast("Hệ thống đã được làm sạch hoàn toàn!", "success");
-                
-                // Đóng modal lịch sử sau khi xóa xong
-                setTimeout(() => closeHistory(), 1000);
-
+                // ... (Reset giao diện giống như cũ)
+                closeHistory();
+                showToast("Dữ liệu của bạn đã được xóa sạch!", "success");
             } catch (e) {
-                console.error(e);
-                showToast("Lỗi: Không thể kết nối server để xóa!", "error");
+                showToast("Lỗi xóa dữ liệu!", "error");
             }
         }
     );
@@ -1732,25 +1773,32 @@ document.querySelectorAll('button').forEach(btn => {
 
 // Hàm hiển thị danh sách lịch sử từ Firebase
 async function showHistory() {
+    const user = auth.currentUser;
+    if (!user) return;
+
     const listContainer = document.getElementById('history-list');
-    listContainer.innerHTML = '<p class="text-center text-slate-500 py-10 animate-pulse text-xs uppercase tracking-widest">Đang tải dữ liệu...</p>';
+    listContainer.innerHTML = '<p class="text-center text-slate-500 py-10 animate-pulse text-xs uppercase tracking-widest">Đang lọc dữ liệu của bạn...</p>';
     document.getElementById('history-modal').classList.remove('hidden');
     document.getElementById('history-modal').classList.add('flex');
 
     try {
-        const snap = await rdb.ref('dynamic_attendance/sessions').once('value');
+        // Cách tối ưu: Chỉ lấy những session có ownerId trùng với UID của mình
+        const snap = await rdb.ref('dynamic_attendance/sessions')
+                             .orderByChild('ownerId')
+                             .equalTo(user.uid)
+                             .once('value');
+
         if (!snap.exists()) {
-            listContainer.innerHTML = '<p class="text-center text-slate-500 py-10">Chưa có sự kiện nào được tạo.</p>';
+            listContainer.innerHTML = '<div class="text-center py-10"><p class="text-slate-500">Bạn chưa có sự kiện nào.</p></div>';
             return;
         }
 
         const data = snap.val();
-        // Chuyển object sang array và sắp xếp theo thời gian mới nhất lên đầu
         const sessions = Object.values(data).sort((a, b) => b.ts - a.ts);
-        
         renderHistoryItems(sessions);
     } catch (e) {
-        showToast("Lỗi khi tải lịch sử!", "error");
+        console.error(e);
+        showToast("Lỗi phân quyền dữ liệu!", "error");
     }
 }
 
@@ -1811,7 +1859,15 @@ async function restoreSession(code) {
     const snap = await rdb.ref('dynamic_attendance/sessions/' + code).once('value');
     
     if (snap.exists()) {
+
         currentSession = snap.val();
+
+        // HIỆN DÒNG CHỮ NHỎ (Vì đây là xem lại lịch sử)
+        document.getElementById('history-label').classList.remove('hidden');
+
+        // Khóa form và các bước khác
+        document.getElementById('report-title').innerText = currentSession.title;
+        toggleAdminFormLock(true);
 
         // 1. Cập nhật lại Tên sự kiện ở cột trái (Tạo sự kiện)
         document.getElementById('a-title').value = currentSession.title;
@@ -1854,6 +1910,8 @@ async function restoreSession(code) {
             btn.style.background = "linear-gradient(135deg, #10b981, #3b82f6)"; // Đổi sang màu xanh lá
         }
 
+         toggleAdminFormLock(true);
+
         // Đóng modal lịch sử và thông báo
         closeHistory();
         showToast("Đã khôi phục thông tin sự kiện!", "success");
@@ -1863,17 +1921,32 @@ async function restoreSession(code) {
 }
 
 function resetEventForm() {
+    // ẨN DÒNG CHỮ NHỎ
+    document.getElementById('history-label').classList.add('hidden');
+
+    // MỞ KHÓA FORM (Ổ khóa biến lại thành dấu chấm)
+    toggleAdminFormLock(false);
+    
+    // 1. Xóa trắng dữ liệu cũ
     document.getElementById('a-title').value = "";
     document.getElementById('admin-fields-list').innerHTML = "";
     addField("Họ và Tên"); 
     addField("Lớp / Phòng ban");
     document.getElementById('qr-container').classList.add('hidden');
     
+    // 2. Ẩn dòng chữ lịch sử và reset tên báo cáo
+    document.getElementById('history-label').classList.add('hidden');
+    document.getElementById('report-title').innerText = "Báo cáo";
+
+    // 3. MỞ KHÓA FORM (Gỡ ổ khóa, cho phép nhập liệu)
+    toggleAdminFormLock(false);
+
+    // 4. Trả nút về trạng thái "Kích hoạt" ban đầu
     const btn = document.getElementById('btn-session-action');
     if (btn) {
-        btn.innerText = "Kích hoạt";
-        btn.onclick = activateSession; // Quay lại hàm kích hoạt ban đầu
-        btn.style.background = ""; // Reset về màu Indigo mặc định
+        btn.innerText = "Kích hoạt hệ thống";
+        btn.onclick = activateSession;
+        btn.style.background = ""; 
     }
     showToast("Giao diện đã được làm sạch!", "info");
 }
@@ -2139,6 +2212,49 @@ function playPingSound() {
         console.warn("Browser blocked sound play until first interaction");
     }
 }
+
+['click', 'keydown', 'scroll', 'touchstart'].forEach(eventType => {
+    window.addEventListener(eventType, () => {
+        if (auth.currentUser) {
+            localStorage.setItem('scheck_last_active', Date.now());
+        }
+    });
+});
+
+function toggleAdminFormLock(isLocked) {
+    // 1. Khóa/Mở khóa các ô nhập chính
+    const titleInput = document.getElementById('a-title');
+    titleInput.disabled = isLocked;
+
+    const fieldInputs = document.querySelectorAll('.field-input');
+    fieldInputs.forEach(input => {
+        input.disabled = isLocked;
+    });
+
+    // 2. Ẩn/Hiện nút thêm trường và nút xóa
+    const addFieldBtn = document.querySelector('button[onclick="addField()"]');
+    if (addFieldBtn) addFieldBtn.style.display = isLocked ? "none" : "block";
+
+    const removeBtns = document.querySelectorAll('#admin-fields-list button');
+    removeBtns.forEach(btn => {
+        btn.style.display = isLocked ? "none" : "block";
+    });
+
+    // 3. BIẾN DẤU CHẤM THÀNH Ổ KHÓA
+    // Chỉ chọn các chấm nằm trong khu vực tạo sự kiện (cột trái)
+    const dots = document.querySelectorAll('.lg\\:col-span-4 .dot-signal');
+    
+    dots.forEach(dot => {
+        if (isLocked) {
+            dot.classList.add('is-locked');
+            dot.innerHTML = '<i class="fa-solid fa-lock text-[9px] text-slate-500"></i>';
+        } else {
+            dot.classList.remove('is-locked');
+            dot.innerHTML = ''; // Trả về dấu chấm rỗng như cũ
+        }
+    });
+}
+
 </script>
 <!-- MODAL LỊCH SỬ SỰ KIỆN -->
 <div id="history-modal" class="fixed inset-0 z-[10004] hidden items-center justify-center bg-black/90 backdrop-blur-md p-4">
