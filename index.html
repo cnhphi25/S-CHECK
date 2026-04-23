@@ -1810,7 +1810,7 @@ async function exportToExcel() {
         // 12. XUẤT FILE VÀ TẢI VỀ
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `BaoCao_${createSlug(currentSession.title)}.xlsx`);
+        saveAs(blob, `Danh sách điểm danh ${currentSession.title}.xlsx`);
 
         showToast("Xuất file thành công!", "success");
 
@@ -1890,7 +1890,7 @@ async function exportSpecificSession(code) {
 
         const buffer = await workbook.xlsx.writeBuffer();
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-        saveAs(blob, `LichSu_${createSlug(session.title)}.xlsx`);
+        saveAs(blob, `Danh sách điểm danh ${session.title}.xlsx`);
         showToast("Đã xuất file Excel thành công!", "success");
 
     } catch (e) {
