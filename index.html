@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+    <!-- Liên kết file manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Cấu hình cho iPhone (iOS) -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="S-CHECK Pro">
+    <link rel="apple-touch-icon" href="https://i.ibb.co/XfkmdYjC/LOGO-S-CHECK.png">
+
+    <!-- Cấu hình màu thanh điều hướng trên Android -->
+    <meta name="theme-color" content="#030712">
+
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>S-CHECK Pro • Digital Attendance</title>
@@ -1032,6 +1044,10 @@ function createSlug(str) {
     str = str.replace(/\s+/g, "-"); // Thay khoảng trắng bằng gạch ngang
     str = str.replace(/[^a-z0-9-]/g, ""); // Xóa ký tự đặc biệt
     return str + "-" + Math.floor(1000 + Math.random() * 9000); // Thêm 4 số ngẫu nhiên để tránh trùng
+}
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
 }
 
 // 1. KHỞI TẠO SỰ KIỆN & TẠO SHEET (GET)
@@ -2723,5 +2739,6 @@ function getUniqueDeviceId() {
         <div id="history-list" class="flex-1 overflow-y-auto space-y-3 custom-scrollbar"></div>
     </div>
 </div>
+
 </body>
 </html>
