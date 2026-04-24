@@ -1623,6 +1623,28 @@ function clearAllHistory() {
     );
 }
 
+// Hàm xóa một bản ghi điểm danh cụ thể
+async function deleteLog(logId) {
+    // Kiểm tra xem hiện tại có đang chọn session nào không
+    if (!currentSession || !currentSession.code) {
+        return showToast("Lỗi: Không xác định được sự kiện!", "error");
+    }
+
+    // Hiển thị hộp thoại xác nhận trước khi xóa
+    showConfirm("XÁC NHẬN: Bạn muốn xóa dòng điểm danh này?", async () => {
+        try {
+            // Thực hiện xóa trên Firebase Realtime Database
+            await rdb.ref(`dynamic_attendance/logs/${currentSession.code}/${logId}`).remove();
+            
+            // Thông báo thành công
+            showToast("Đã xóa bản ghi!", "success");
+        } catch (e) {
+            console.error("Lỗi xóa bản ghi:", e);
+            showToast("Không thể xóa dữ liệu trên Server!", "error");
+        }
+    });
+}
+
 // Hàm xóa sạch báo cáo hiện tại (Xóa Firebase và Xóa nội dung Google Sheet)
 function clearLogs() {
     if (!currentSession || !currentSession.code) {
