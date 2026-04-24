@@ -2488,39 +2488,30 @@ async function handleGpsToggle() {
     const radiusContainer = document.getElementById('radius-setting-container');
     const isChecked = toggle.checked;
 
-    // PHẦN 1: CẬP NHẬT GIAO DIỆN NGAY LẬP TỨC
+    // PHẦN 1: CẬP NHẬT GIAO DIỆN NGAY LẬP TỨC (Giữ nguyên)
     if (isChecked) {
         radiusContainer.style.opacity = "1";
         radiusContainer.style.pointerEvents = "auto";
-        // Nếu bật: Không return để chạy tiếp xuống phần lấy GPS bên dưới
     } else {
         radiusContainer.style.opacity = "0.5";
         radiusContainer.style.pointerEvents = "none";
         showToast("CHẾ ĐỘ TỰ DO: ĐÃ TẮT BẢO MẬT GPS", "info");
 
-        // ĐỒNG BỘ SERVER: Nếu tắt GPS, báo cho Firebase để sinh viên không bị hỏi GPS nữa
         if (currentSession && currentSession.code) {
             await rdb.ref('dynamic_attendance/sessions/' + currentSession.code).update({
                 requireLocation: false
             });
             currentSession.requireLocation = false;
         }
-        return; // Kết thúc hàm nếu là TẮT
+        return; 
     }
 
-    // PHẦN 2: XỬ LÝ THEO LOẠI THIẾT BỊ (PC HAY MOBILE)
+    // PHẦN 2: XỬ LÝ THEO LOẠI THIẾT BỊ
     if (adminDeviceType === 'mobile') {
-        // --- TRƯỜNG HỢP ADMIN DÙNG ĐIỆN THOẠI ---
+        // --- TRƯỜNG HỢP ADMIN DÙNG ĐIỆN THOẠI --- (Giữ nguyên)
         showToast("Đang xác thực tọa độ hệ thống...", "info");
-
         navigator.geolocation.getCurrentPosition(async (pos) => {
-            const coords = { 
-                lat: pos.coords.latitude, 
-                lng: pos.coords.longitude,
-                ts: Date.now() 
-            };
-
-            // Lưu tọa độ trực tiếp vào Session đang chạy
+            const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude, ts: Date.now() };
             if (currentSession && currentSession.code) {
                 await rdb.ref('dynamic_attendance/sessions/' + currentSession.code).update({
                     adminLocation: coords,
@@ -2531,10 +2522,8 @@ async function handleGpsToggle() {
             }
             showToast("TÍN HIỆU GPS: ĐÃ SẴN SÀNG", "success");
         }, (err) => {
-            // Nếu lỗi GPS trên điện thoại: Tự gạt nút về OFF
             toggle.checked = false;
             radiusContainer.style.opacity = "0.5";
-            radiusContainer.style.pointerEvents = "none";
             showToast(getGpsErrorMessage(err), "error");
         }, { enableHighAccuracy: true });
 
@@ -2546,7 +2535,10 @@ async function handleGpsToggle() {
             return showToast("Vui lòng 'Kích hoạt' sự kiện trước khi bật GPS!", "error");
         }
 
-        // Hiện Modal QR để Admin dùng điện thoại quét (Mỏ neo)
+        // --- DÒNG THÊM MỚI 1: Xóa vị trí cũ trên server để ép điện thoại phải quét lại mới có dữ liệu ---
+        await rdb.ref('dynamic_attendance/sessions/' + currentSession.code + '/adminLocation').remove();
+
+        // Hiện Modal QR (Giữ nguyên)
         const anchorUrl = window.location.origin + window.location.pathname + "?anchor=" + currentSession.code;
         document.getElementById('anchor-qr-box').innerHTML = `
             <div style="background:white; padding:15px; border-radius:20px; box-shadow:inset 0 0 10px rgba(0,0,0,0.1);">
@@ -2554,22 +2546,24 @@ async function handleGpsToggle() {
             </div>`;
         document.getElementById('anchor-qr-modal').classList.remove('hidden');
 
-        // LẮNG NGHE TÍN HIỆU TỪ ĐIỆN THOẠI GỬI LÊN FIREBASE
+        // LẮNG NGHE TÍN HIỆU
         const anchorRef = rdb.ref('dynamic_attendance/sessions/' + currentSession.code + '/adminLocation');
+        
+        // --- DÒNG THÊM MỚI 2: Tắt các kết nối lắng nghe cũ để không bị chồng chéo dữ liệu ---
+        anchorRef.off(); 
+
         anchorRef.on('value', snap => {
             if (snap.exists()) {
                 currentSession.adminLocation = snap.val();
                 document.getElementById('anchor-qr-modal').classList.add('hidden');
-                showToast("TÍN HIỆU GPS: ĐÃ SẴN SÀNG", "success");
+                showToast("TÍN HIỆU GPS: ĐÃ CẬP NHẬT VỊ TRÍ MỚI", "success");
                 
-                // Sau khi điện thoại Admin đã chốt vị trí, kích hoạt chế độ bắt buộc GPS cho người quét
                 rdb.ref('dynamic_attendance/sessions/' + currentSession.code).update({ 
                     requireLocation: true 
                 });
                 currentSession.requireLocation = true;
 
-                // Ngắt kết nối lắng nghe để tránh lặp dữ liệu
-                anchorRef.off();
+                anchorRef.off(); // Ngắt sau khi nhận được vị trí mới
             }
         });
     }
